@@ -11,6 +11,7 @@ void *mythread(void *arg) {
     for (int i = 0; i < 100000; i++){}
     return 0;
 }
+
 int main() {
     pthread_t tid;
     int err;

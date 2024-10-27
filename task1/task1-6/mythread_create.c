@@ -80,9 +80,9 @@ int start_routine(void* arg) {
     //ToDo: make futex
     printf("mythread started waiting stage for join.\n thread_id: %d\n", thread->mythread_id);
 
-    if (!thread->joined && !thread->isDetached) {
-        fwait(&thread->joinedFutex);
-    }
+    //if (!thread->joined && !thread->isDetached) {
+    //    fwait(&thread->joinedFutex);
+    //}
     //while(!thread->joined && !thread->isDetached) {
     //    sleep(1);
     //}
@@ -113,7 +113,7 @@ int mythread_create(mythread_struct_t** mythread, mythread_routine routine, void
     thread->mythread_id = thread_num;
     thread->arg = arg;
     thread->routine = routine;
-    thread->finished = 0;
+    thread->notFinished = 1;
     thread->joined = 0;
     thread->isDetached = 1;
     int err = clone(start_routine,  (void*)thread, CLONE_VM|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_CHILD_CLEARTID, thread);
@@ -129,7 +129,7 @@ void mythread_cancel(mythread_struct_t* thread) {
     thread->isCancelled = 1; 
 }
 
-void mythread_join(mythread_struct_t* mythread) {
+void* mythread_join(mythread_struct_t* mythread) {
     printf("waiting for thread %d to be finished\n", mythread->mythread_id);
     fwait(&mythread->finishedFutex);
     //while(!mythread->finished) {
@@ -140,6 +140,7 @@ void mythread_join(mythread_struct_t* mythread) {
     printf("mythread return value is '%s'", (char*)mythread->retval);
     mythread->joined = 1;
     fpost(&mythread->joinedFutex);
+    return mythread->retval;
 }
 
 void* mythread(void* arg) {

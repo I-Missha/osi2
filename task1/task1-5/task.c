@@ -55,16 +55,14 @@ int main() {
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
     //pthread_create(&tid_sigblock, &attr, block_routine, NULL);
     pthread_create(&tid_sigquit, &attr, quit_routine, NULL);
-    pthread_create(&tid_sigint, &attr, int_routine, NULL);
-    
     struct sigaction ex;
     ex.sa_handler = myexit;
     sigaction(SIGINT, &ex, NULL);
-
+    pthread_create(&tid_sigint, &attr, int_routine, NULL);
+    
     sigset_t set;
     sigfillset(&set);
     int s = pthread_sigmask(SIG_SETMASK, &set, NULL);
-
 
 
     while(1){}
