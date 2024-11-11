@@ -36,14 +36,13 @@ typedef struct uthreads_list {
 } uthreads_list;
 
 typedef struct stack_to_clear {
-    void **stacksArr;
+    void *stacksArr[MAX_STACKS_TO_CLEAR];
     int currNum;
     int const timeToClear;
     int currTime;
 } stack_to_clear;
 
-void *stacksArr[MAX_STACKS_TO_CLEAR];
-stack_to_clear stack_list = {stacksArr, 0, 20, 0};
+stack_to_clear stack_list = {{}, 0, 30, 0};
 uthreads_list ulist = {NULL, NULL, NULL};
 uthread_t *curr_uthread_exe;
 
@@ -65,7 +64,12 @@ void uthread_scheduler() {
     stack_list.currTime++;
     if (stack_list.currTime == stack_list.timeToClear) {
         for (int i = 0; i < stack_list.currNum; i++) {
-            munmap(stack_list.stacksArr[i], STACK_SIZE);
+            if (stack_list.stacksArr[i] == NULL)
+                continue;
+            printf("going to munmap stack: %p\n", stack_list.stacksArr[i]);
+            if (munmap(stack_list.stacksArr[i], STACK_SIZE) == -1) {
+                exit(1);
+            }
         }
         stack_list.currTime = 0;
         stack_list.currNum = 0;
