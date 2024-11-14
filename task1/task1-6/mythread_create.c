@@ -17,7 +17,7 @@
 #define PAGE_SIZE 4096
 #define STACK_SIZE PAGE_SIZE * 4
 #define MYTHREAD_CANCELLED (void *)1234453
-
+#define STACKS_NUM 100
 typedef unsigned long int mythread_t;
 typedef void *(*mythread_routine)(void *);
 
@@ -46,14 +46,9 @@ void mythread_testcancel(mythread_struct_t *thread) {
 thread_local ucontext_t new_context;
 thread_local mythread_struct_t local_thread;
 void free_stack_of_thread() {
-    printf(
-        "routine finished: thread_id: %d\n",
-        munmap(
-            local_thread.stack + sizeof(mythread_struct_t) - STACK_SIZE,
-            STACK_SIZE
-        )
-    );
+    printf("%d\n", munmap(local_thread.stack, STACK_SIZE));
 }
+
 int start_routine(void *arg) {
 
     mythread_struct_t *thread = (mythread_struct_t *)arg;
@@ -72,7 +67,7 @@ int start_routine(void *arg) {
 
     if (thread->isDetached) {
         void *new_stack = (void *)malloc(PAGE_SIZE);
-
+        getcontext(&new_context);
         new_context.uc_stack.ss_sp = new_stack;
         new_context.uc_stack.ss_size = PAGE_SIZE;
         new_context.uc_stack.ss_flags = 0;
@@ -108,17 +103,17 @@ int mythread_create(
         child_stack + PAGE_SIZE, STACK_SIZE - PAGE_SIZE, PROT_READ | PROT_WRITE
     );
 
-    thread = (mythread_struct_t *)(child_stack + STACK_SIZE -
-                                   sizeof(mythread_struct_t));
+    thread = (child_stack + STACK_SIZE - sizeof(mythread_struct_t));
     thread->stack = child_stack;
     thread->mythread_id = thread_num;
     thread->arg = arg;
     thread->routine = routine;
     thread->notFinished = 1;
     thread->isDetached = 0;
+    printf("%p\n", child_stack);
     int err = clone(
         start_routine,
-        (void *)thread,
+        child_stack + STACK_SIZE - sizeof(mythread_struct_t),
         CLONE_VM | CLONE_FILES | CLONE_SIGHAND | CLONE_THREAD |
             CLONE_CHILD_CLEARTID | CLONE_CHILD_CLEARTID,
         thread,
@@ -151,13 +146,11 @@ int mythread_join(mythread_struct_t *mythread, void **retval) {
     if (retval != NULL) {
         *retval = mythread->retval;
     }
-
-    printf(
-        "%i\n",
-        munmap(
-            mythread->stack + sizeof(mythread_struct_t) - STACK_SIZE, STACK_SIZE
-        )
-    );
+    mythread_struct_t saved = *mythread;
+    printf("%p\n", saved.stack);
+    int err = munmap((void *)saved.stack, STACK_SIZE);
+    printf("%d\n", err);
+    printf("%s\n", strerror(errno));
     return 0;
 }
 
@@ -174,7 +167,7 @@ void *mythread(void *arg) {
 
 int main() {
     mythread_create(&tid, mythread, "hello");
-    // mythread_detach(tid);
+    mythread_detach(tid);
     char retval[20];
     sleep(1);
     // mythread_cancel(tid);
