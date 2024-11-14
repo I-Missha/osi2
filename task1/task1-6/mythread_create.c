@@ -46,8 +46,12 @@ void mythread_testcancel(mythread_struct_t *thread) {
 thread_local ucontext_t new_context;
 thread_local mythread_struct_t local_thread;
 void free_stack_of_thread() {
-    munmap(
-        local_thread.stack + sizeof(mythread_struct_t) - STACK_SIZE, STACK_SIZE
+    printf(
+        "routine finished: thread_id: %d\n",
+        munmap(
+            local_thread.stack + sizeof(mythread_struct_t) - STACK_SIZE,
+            STACK_SIZE
+        )
     );
 }
 int start_routine(void *arg) {
@@ -133,6 +137,7 @@ int mythread_create(
 void mythread_cancel(mythread_struct_t *thread) {
     thread->isCancelled = 1;
 }
+
 int mythread_join(mythread_struct_t *mythread, void **retval) {
     printf("waiting for thread_id: %d to be finished\n", mythread->mythread_id);
     if (mythread->isDetached) {
@@ -147,8 +152,11 @@ int mythread_join(mythread_struct_t *mythread, void **retval) {
         *retval = mythread->retval;
     }
 
-    munmap(
-        mythread->stack + sizeof(mythread_struct_t) - STACK_SIZE, STACK_SIZE
+    printf(
+        "%i\n",
+        munmap(
+            mythread->stack + sizeof(mythread_struct_t) - STACK_SIZE, STACK_SIZE
+        )
     );
     return 0;
 }
@@ -169,7 +177,7 @@ int main() {
     // mythread_detach(tid);
     char retval[20];
     sleep(1);
-    mythread_cancel(tid);
+    // mythread_cancel(tid);
     mythread_join(tid, (void *)retval);
     sleep(7);
     return 0;

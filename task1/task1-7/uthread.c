@@ -1,3 +1,5 @@
+#include <sys/ucontext.h>
+#include <time.h>
 #define _GNU_SOURCE
 #include <assert.h>
 #include <err.h>
@@ -5,12 +7,14 @@
 #include <fcntl.h>
 #include <linux/futex.h>
 #include <sched.h>
+#include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/syscall.h>
+#include <time.h>
 #include <ucontext.h>
 #include <unistd.h>
 
@@ -27,6 +31,9 @@ typedef struct uthread {
     void *arg;
     ucontext_t uctx;
     struct uthread *next;
+    uint8_t isSleep;
+    uint64_t timeToSleep;
+    clock_t start;
 } uthread_t;
 
 typedef struct uthreads_list {
@@ -58,7 +65,9 @@ void *create_stack(int size) {
     return stack;
 }
 
+int isSchduler_active = 0;
 void uthread_scheduler() {
+    isSchduler_active = 1;
     int err;
     ucontext_t *cur_ctx, *next_ctx;
     stack_list.currTime++;
@@ -76,18 +85,58 @@ void uthread_scheduler() {
     }
     // cur_ctx = &(uthreads[uthread_curr]->uctx);
     // uthread_curr = (uthread_curr + 1) % uthread_count;
-    cur_ctx = &ulist.curr->uctx;
-    next_ctx = &ulist.curr->next->uctx;
-    ulist.curr = ulist.curr->next;
+    // ToDo: find uthread that we can wake up
+    uthread_t *utid_curr = ulist.curr;
+    ucontext_t save_ctx = ulist.curr->uctx;
+    getcontext(&save_ctx);
+    uthread_t *utid_iter = utid_curr;
+    if (utid_iter->next == NULL) {
+        utid_iter = ulist.first;
+    }
+    utid_iter = utid_curr->next;
+    while (utid_iter->isSleep &&
+           ((clock() - utid_iter->start) / CLOCKS_PER_SEC <
+            utid_iter->timeToSleep)) {
+        if (utid_iter->next == NULL) {
+            utid_iter = ulist.first;
+            continue;
+        }
+        utid_iter = utid_iter->next;
+    }
+    /*printf(*/
+    /*    "diff: %ld \ntime to sleep: %ld\n",*/
+    /*    (clock() - utid_iter->start) / CLOCKS_PER_SEC,*/
+    /*    utid_iter->timeToSleep*/
+    /*);*/
+    utid_iter->isSleep = 0;
+    cur_ctx = &utid_curr->uctx;
+    next_ctx = &utid_iter->uctx;
+    ulist.curr = utid_iter;
+
     // next_ctx = &(uthreads[uthread_curr]->uctx);
+    isSchduler_active = 0;
+    // printf("%s", utid_iter->name);
     err = swapcontext(cur_ctx, next_ctx);
+    if (utid_curr->isSleep) {
+        isSchduler_active = 1;
+        setcontext(&save_ctx);
+    }
     if (err == -1) {
         printf("error in uthread_schedulr: %s", strerror(errno));
         exit(1);
     }
-    // printf("%s\n", ulist.curr->name);
+    // printf("hello\n");
+    //  printf("%s\n", ulist.curr->name);
 }
 
+void uthread_sleep(uint64_t sleep_time) {
+    ulist.curr->isSleep = 1;
+    ulist.curr->timeToSleep = sleep_time;
+    ulist.curr->start = clock();
+    uthread_scheduler();
+}
+
+uthread_t *saved;
 void start_thread() {
     uthread_t *curr = ulist.curr;
     curr->thread_func(curr->arg);
@@ -102,20 +151,28 @@ void start_thread() {
     stack_list.stacksArr[stack_list.currNum] = curr->stack;
     stack_list.currNum++;
     uthread_scheduler();
-    /*
-    int i;
-    ucontext_t *ctx;
-    for (i = 0; i < uthread_count; i++) {
-        ctx = &uthreads[i]->uctx;
-        char* stack_from = ctx->uc_stack.ss_sp;
-        char* stack_to = ctx->uc_stack.ss_sp + ctx->uc_stack.ss_size;
+}
 
-        char* temp = (char*)&i;
-        if (stack_from <=  temp && temp <= stack_to) {
-            uthreads[i]->thread_func(uthreads[i]->arg);
-        }
+ucontext_t sched;
+void uthread_sched_yield() {
+    while (1) {
+        uthread_scheduler();
     }
-    */
+}
+
+void uthread_sched_init() {
+    getcontext(&sched);
+    void *stack = create_stack(STACK_SIZE);
+    mprotect(stack, STACK_SIZE, PROT_READ | PROT_WRITE);
+    sched.uc_stack.ss_sp = stack;
+    sched.uc_stack.ss_size = STACK_SIZE;
+    sched.uc_link = NULL;
+    makecontext(&sched, uthread_sched_yield, 0);
+}
+
+void custom_sleep() {
+    for (uint64_t i = 0; i < 1000000000; i++) {
+    }
 }
 
 void uthread_create(
@@ -143,7 +200,7 @@ void uthread_create(
     new_ut->uctx.uc_stack.ss_sp = stack;
     new_ut->uctx.uc_stack.ss_size = STACK_SIZE - sizeof(uthread_t);
     new_ut->uctx.uc_link = NULL;
-
+    new_ut->isSleep = 0;
     makecontext(&new_ut->uctx, start_thread, 0);
 
     new_ut->thread_func = thread_func;
@@ -158,19 +215,35 @@ void uthread_create(
 }
 
 void uthread(void *arg) {
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < 3; i++) {
         printf("hello from: %s\n", (char *)arg);
-        sleep(1);
-        uthread_scheduler();
+        uthread_sleep(1);
+        //  printf("sleep\n");
+        // custom_sleep();
     }
     return;
 }
+
+void alarm_sig_handler() {
+    struct sigaction alarm_sigaction;
+    alarm_sigaction.sa_handler = alarm_sig_handler;
+    sigaction(SIGALRM, &alarm_sigaction, NULL);
+    alarm(1);
+    if (isSchduler_active) {
+        return;
+    }
+    setcontext(&sched);
+    // uthread_scheduler();
+}
+
 int ones = 0;
 int main() {
-
+    struct sigaction alarm_sigaction;
+    alarm_sigaction.sa_handler = alarm_sig_handler;
+    sigaction(SIGALRM, &alarm_sigaction, NULL);
+    uthread_sched_init();
+    alarm(1);
     uthread_t main_thread;
-    // uthreads[0] = &main_thread;
-    // uthread_count++;
     ulist.curr = &main_thread;
     ulist.first = &main_thread;
     ulist.last = &main_thread;
@@ -178,6 +251,7 @@ int main() {
     uthread_t *ut1;
     strncpy(main_thread.name, "user thread main", NAME_SIZE);
     main_thread.next = NULL;
+    main_thread.isSleep = 0;
     getcontext(&main_thread.uctx);
     // if (!ones) {
     uthread_create(&ut0, "user thread zero", uthread, "000 000");
@@ -185,12 +259,10 @@ int main() {
     uthread_create(&ut1, "user thread two", uthread, "222 222");
     ones = 1;
     //}
-    int a = 0;
-    while (a < 100) {
-        uthread_scheduler();
-        //    printf("main\n");
-        a++;
-    }
-    printf("main\n");
+    uthread_sleep(10);
+    /*for (int i = 0; i < 10; i++) {*/
+    /*    custom_sleep();*/
+    /*    uthread_scheduler();*/
+    /*}*/
     return 0;
 }
