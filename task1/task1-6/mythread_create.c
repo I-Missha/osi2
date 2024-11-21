@@ -167,7 +167,7 @@ void *mythread(void *arg) {
 
 int main() {
     mythread_create(&tid, mythread, "hello");
-    mythread_detach(tid);
+    // mythread_detach(tid);
     char retval[20];
     sleep(1);
     // mythread_cancel(tid);
