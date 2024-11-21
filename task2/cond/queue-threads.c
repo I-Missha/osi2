@@ -1,5 +1,4 @@
 #define _GNU_SOURCE
-#include <errno.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,13 +36,17 @@ void *reader(void *arg) {
     queue_t *q = (queue_t *)arg;
     printf("reader [%d %d %d]\n", getpid(), getppid(), gettid());
 
-    set_cpu(2);
+    set_cpu(1);
 
     while (1) {
         int val = -1;
-        pthread_spin_lock(&q->spinlock);
+        pthread_mutex_lock(&q->mutex);
+        while (q->count == 0) {
+            pthread_cond_wait(&q->get_cond, &q->mutex);
+        }
         int ok = queue_get(q, &val);
-        pthread_spin_unlock(&q->spinlock);
+        pthread_cond_signal(&q->add_cond);
+        pthread_mutex_unlock(&q->mutex);
         if (!ok)
             continue;
 
@@ -65,12 +68,16 @@ void *writer(void *arg) {
     queue_t *q = (queue_t *)arg;
     printf("writer [%d %d %d]\n", getpid(), getppid(), gettid());
 
-    set_cpu(1);
+    set_cpu(2);
 
     while (1) {
-        pthread_spin_lock(&q->spinlock);
+        pthread_mutex_lock(&q->mutex);
+        while (q->count == q->max_count) {
+            pthread_cond_wait(&q->add_cond, &q->mutex);
+        }
         int ok = queue_add(q, i);
-        pthread_spin_unlock(&q->spinlock);
+        pthread_cond_signal(&q->get_cond);
+        pthread_mutex_unlock(&q->mutex);
         if (!ok)
             continue;
         i++;
@@ -94,15 +101,13 @@ int main() {
         return -1;
     }
 
-    // sched_yield();
+    sched_yield();
 
     err = pthread_create(&tid, NULL, writer, q);
     if (err) {
         printf("main: pthread_create() failed: %s\n", strerror(err));
         return -1;
     }
-
-    // TODO: join threads
 
     pthread_exit(NULL);
 

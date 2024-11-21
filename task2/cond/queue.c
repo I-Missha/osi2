@@ -23,7 +23,6 @@ queue_t *queue_init(int max_count) {
         printf("Cannot allocate memory for a queue\n");
         abort();
     }
-    pthread_spin_init(&q->spinlock, PTHREAD_PROCESS_PRIVATE);
     q->first = NULL;
     q->last = NULL;
     q->max_count = max_count;
@@ -48,7 +47,9 @@ void queue_destroy(queue_t *q) {
         printf("stats from queue destroy\n");
         queue_print_stats(q);
     }
-    pthread_spin_destroy(&q->spinlock);
+    pthread_mutex_destroy(&q->mutex);
+    pthread_cond_destroy(&q->get_cond);
+    pthread_cond_destroy(&q->add_cond);
     free(q);
 }
 

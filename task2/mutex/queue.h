@@ -23,7 +23,7 @@ typedef struct _Queue {
 
     int count;
     int max_count;
-    pthread_spinlock_t spinlock;
+    pthread_mutex_t mutex;
     // queue statistics
     long add_attempts;
     long get_attempts;
