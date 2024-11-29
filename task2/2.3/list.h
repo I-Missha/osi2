@@ -1,5 +1,5 @@
-#ifndef __FITOS_QUEUE_H__
-#define __FITOS_QUEUE_H__
+#ifndef __FITOS_list_H__
+#define __FITOS_list_H__
 
 #define _GNU_SOURCE
 #include <errno.h>
@@ -10,33 +10,36 @@
 #include <unistd.h>
 
 #include <pthread.h>
-typedef struct _QueueNode {
+typedef struct _ListNode {
     int val;
-    struct _QueueNode *next;
-} qnode_t;
+    struct _ListNode *next;
+    char string[100];
+    pthread_mutex_t mutex;
+} lnode_t;
 
-typedef struct _Queue {
-    qnode_t *first;
-    qnode_t *last;
+typedef struct _List {
+    lnode_t *first;
+    lnode_t *last;
 
-    pthread_t qmonitor_tid;
+    pthread_t lmonitor_tid;
 
+    pthread_mutex_t count_mutex;
+    int count_equal;
+    int count_less;
+    int count_more;
     int count;
     int max_count;
-    pthread_mutex_t mutex;
-    pthread_cond_t get_cond;
-    pthread_cond_t add_cond;
-    // queue statistics
-    long add_attempts;
-    long get_attempts;
-    long add_count;
-    long get_count;
-} queue_t;
+    int swap_count;
+    // pthread_cond_t get_cond;
+    // pthread_cond_t add_cond;
+    //  list statistics
+} list_t;
 
-queue_t *queue_init(int max_count);
-void queue_destroy(queue_t *q);
-int queue_add(queue_t *q, int val);
-int queue_get(queue_t *q, int *val);
-void queue_print_stats(queue_t *q);
+list_t *list_init(int max_count);
+void swap_nodes(lnode_t *first, lnode_t *second, lnode_t *parent);
+void list_destroy(list_t *l);
+int list_add_last(list_t *l, char *str);
+int list_get(list_t *l, int *val);
+void list_print_stats(list_t *l);
 
-#endif // __FITOS_QUEUE_H__
+#endif // __FITOS_list_H__

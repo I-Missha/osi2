@@ -1,15 +1,15 @@
 #define _GNU_SOURCE
 #include <pthread.h>
+#include <sched.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+#include <time.h>
 #include <unistd.h>
 
-#include <pthread.h>
-#include <sched.h>
-
-#include "queue.h"
+#include "list.h"
 
 #define RED "\033[41m"
 #define NOCOLOR "\033[0m"
@@ -31,83 +31,143 @@ void set_cpu(int n) {
     printf("set_cpu: set cpu %d\n", n);
 }
 
-void *reader(void *arg) {
-    int expected = 0;
-    queue_t *q = (queue_t *)arg;
-    printf("reader [%d %d %d]\n", getpid(), getppid(), gettid());
-
-    set_cpu(1);
-
-    while (1) {
-        int val = -1;
-        pthread_mutex_lock(&q->mutex);
-        while (q->count == 0) {
-            pthread_cond_wait(&q->get_cond, &q->mutex);
-        }
-        int ok = queue_get(q, &val);
-        pthread_cond_signal(&q->add_cond);
-        pthread_mutex_unlock(&q->mutex);
-        if (!ok)
-            continue;
-
-        if (expected != val)
-            printf(
-                RED "ERROR: get value is %d but expected - %d" NOCOLOR "\n",
-                val,
-                expected
-            );
-
-        expected = val + 1;
+int isLess(lnode_t *first, lnode_t *second) {
+    return strlen(first->string) < strlen(second->string);
+}
+int isMore(lnode_t *first, lnode_t *second) {
+    return strlen(first->string) > strlen(second->string);
+}
+int isEqual(lnode_t *first, lnode_t *second) {
+    return strlen(first->string) == strlen(second->string);
+}
+void addOne(int (*operation)(lnode_t *, lnode_t *), list_t *list) {
+    if (operation == isMore) {
+        __sync_fetch_and_add(&list->count_more, 1);
+    } else if (operation == isLess) {
+        __sync_fetch_and_add(&list->count_less, 1);
+    } else {
+        __sync_fetch_and_add(&list->count_equal, 1);
     }
-
-    return NULL;
 }
 
-void *writer(void *arg) {
-    int i = 0;
-    queue_t *q = (queue_t *)arg;
-    printf("writer [%d %d %d]\n", getpid(), getppid(), gettid());
+// [list*, comp_func]
+// ToDo: struct like this array
+typedef struct thread_comparision_args {
+    list_t *list;
+    int (*operation)(lnode_t *, lnode_t *);
+} thread_comparision_args;
 
-    set_cpu(2);
-
+void *thread_comparision(void *args) {
+    thread_comparision_args *thread_args = (thread_comparision_args *)args;
+    list_t *list = thread_args->list;
+    int (*operation)(lnode_t *, lnode_t *) = thread_args->operation;
+    lnode_t *iter = list->first;
     while (1) {
-        pthread_mutex_lock(&q->mutex);
-        while (q->count == q->max_count) {
-            pthread_cond_wait(&q->add_cond, &q->mutex);
+        pthread_mutex_t *mutex = &iter->mutex;
+        pthread_mutex_lock(mutex);
+        if (iter->next == NULL) {
+            // the end of iteration over list
+            // ToDo: some work
+            addOne(operation, list);
+            if (pthread_mutex_trylock(&list->first->mutex) == EBUSY) {
+                pthread_mutex_unlock(mutex);
+                usleep(100);
+                continue;
+            }
+            iter = list->first;
+        } else {
+            if (pthread_mutex_trylock(&iter->next->mutex) == EBUSY) {
+                pthread_mutex_unlock(mutex);
+                usleep(100);
+                continue;
+            }
+
+            operation(iter, iter->next);
+            iter = iter->next;
         }
-        int ok = queue_add(q, i);
-        pthread_cond_signal(&q->get_cond);
-        pthread_mutex_unlock(&q->mutex);
+        pthread_mutex_unlock(&iter->mutex);
+        pthread_mutex_unlock(mutex);
+    }
+    return 0;
+}
+
+#define RAND_SWAP 1
+#define RAND_MODULE 20
+void *swap_threads(void *args) {
+    list_t *list = (list_t *)args;
+    srand(time(NULL));
+    lnode_t *iter = list->first;
+    while (1) {
+        int r = rand() % RAND_MODULE;
+        if (r == RAND_SWAP && iter && iter->next && iter->next->next &&
+            iter->next->next->next) {
+            swap_nodes(iter->next, iter->next->next, iter);
+        }
+        pthread_mutex_t *mutex = &iter->mutex;
+        pthread_mutex_lock(mutex);
+        if (iter->next == NULL) {
+            if (pthread_mutex_trylock(&list->first->mutex) == EBUSY) {
+                pthread_mutex_unlock(mutex);
+                usleep(100);
+                continue;
+            }
+            iter = list->first;
+            __sync_fetch_and_add(&list->swap_count, 1);
+        } else {
+            if (pthread_mutex_trylock(&iter->next->mutex) == EBUSY) {
+                pthread_mutex_unlock(mutex);
+                usleep(100);
+                continue;
+            }
+            iter = iter->next;
+        }
+        pthread_mutex_unlock(&iter->mutex);
+        pthread_mutex_unlock(mutex);
+    }
+    return 0;
+}
+
+void fill_list(list_t *list, int size) {
+    int i = 0;
+    char arr[100] = {1};
+    while (i < size) {
+        arr[i % 100] = '\0';
+        int ok = list_add_last(list, arr);
         if (!ok)
             continue;
+        arr[i % 100] = 1;
         i++;
     }
-
-    return NULL;
 }
 
 int main() {
     pthread_t tid;
-    queue_t *q;
+    list_t *l;
     int err;
 
     printf("main [%d %d %d]\n", getpid(), getppid(), gettid());
 
-    q = queue_init(1000000);
-
-    err = pthread_create(&tid, NULL, reader, q);
+    l = list_init(10000);
+    fill_list(l, 10000);
+    thread_comparision_args args_more = {l, isMore};
+    err = pthread_create(&tid, NULL, thread_comparision, &args_more);
+    thread_comparision_args args_less = {l, isLess};
+    err = pthread_create(&tid, NULL, thread_comparision, &args_less);
+    thread_comparision_args args_equal = {l, isEqual};
+    err = pthread_create(&tid, NULL, thread_comparision, &args_equal);
     if (err) {
         printf("main: pthread_create() failed: %s\n", strerror(err));
         return -1;
     }
 
+    for (int i = 0; i < 3; i++) {
+        err = pthread_create(&tid, NULL, swap_threads, l);
+        if (err) {
+            printf("main: pthread_create() failed: %s\n", strerror(err));
+            return -1;
+        }
+    }
     sched_yield();
-
-    err = pthread_create(&tid, NULL, writer, q);
-    if (err) {
-        printf("main: pthread_create() failed: %s\n", strerror(err));
-        return -1;
-    }
 
     pthread_exit(NULL);
 
