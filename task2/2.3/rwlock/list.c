@@ -99,24 +99,24 @@ int list_add_last(list_t *l, char *str) {
 // min size of list should be 4
 // do not use swap_nodes on the last element, due to null in the second node
 void swap_nodes(lnode_t *first, lnode_t *second, lnode_t *parent) {
-    if (pthread_mutex_trylock(&parent->mutex) == EBUSY) {
-        return;
-    }
-    if (pthread_mutex_trylock(&first->mutex) == EBUSY) {
-        pthread_mutex_unlock(&parent->mutex);
-        return;
-    }
-    if (pthread_mutex_trylock(&second->mutex) == EBUSY) {
-        pthread_mutex_unlock(&parent->mutex);
-        pthread_mutex_unlock(&first->mutex);
-        return;
-    }
+    /*if (pthread_mutex_trylock(&parent->mutex) == EBUSY) {*/
+    /*    return;*/
+    /*}*/
+    /*if (pthread_mutex_trylock(&first->mutex) == EBUSY) {*/
+    /*    pthread_mutex_unlock(&parent->mutex);*/
+    /*    return;*/
+    /*}*/
+    /*if (pthread_mutex_trylock(&second->mutex) == EBUSY) {*/
+    /*    pthread_mutex_unlock(&parent->mutex);*/
+    /*    pthread_mutex_unlock(&first->mutex);*/
+    /*    return;*/
+    /*}*/
     parent->next = second;
     first->next = second->next;
     second->next = first;
-    pthread_mutex_unlock(&parent->mutex);
-    pthread_mutex_unlock(&second->mutex);
-    pthread_mutex_unlock(&first->mutex);
+    /*pthread_mutex_unlock(&parent->mutex);*/
+    /*pthread_mutex_unlock(&second->mutex);*/
+    /*pthread_mutex_unlock(&first->mutex);*/
 }
 
 int list_get_first(list_t *l, int *val) {

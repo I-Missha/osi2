@@ -63,25 +63,14 @@ void *thread_comparision(void *args) {
     int (*operation)(lnode_t *, lnode_t *) = thread_args->operation;
     lnode_t *iter = list->first;
     while (1) {
+        pthread_mutex_lock(&iter->mutex);
         pthread_mutex_t *mutex = &iter->mutex;
-        pthread_mutex_lock(mutex);
         if (iter->next == NULL) {
-            // the end of iteration over list
-            // ToDo: some work
-            addOne(operation, list);
-            if (pthread_mutex_trylock(&list->first->mutex) == EBUSY) {
-                pthread_mutex_unlock(mutex);
-                usleep(100);
-                continue;
-            }
+            pthread_mutex_lock(&list->first->mutex);
             iter = list->first;
+            addOne(operation, list);
         } else {
-            if (pthread_mutex_trylock(&iter->next->mutex) == EBUSY) {
-                pthread_mutex_unlock(mutex);
-                usleep(100);
-                continue;
-            }
-
+            pthread_mutex_lock(&iter->next->mutex);
             operation(iter, iter->next);
             iter = iter->next;
         }
@@ -101,24 +90,22 @@ void *swap_threads(void *args) {
         int r = rand() % RAND_MODULE;
         if (r == RAND_SWAP && iter && iter->next && iter->next->next &&
             iter->next->next->next) {
+            pthread_mutex_lock(&iter->mutex);
+            pthread_mutex_lock(&iter->next->mutex);
+            pthread_mutex_lock(&iter->next->next->mutex);
             swap_nodes(iter->next, iter->next->next, iter);
+            pthread_mutex_unlock(&iter->next->next->mutex);
+            pthread_mutex_unlock(&iter->next->mutex);
+            pthread_mutex_unlock(&iter->mutex);
         }
+        pthread_mutex_lock(&iter->mutex);
         pthread_mutex_t *mutex = &iter->mutex;
-        pthread_mutex_lock(mutex);
         if (iter->next == NULL) {
-            if (pthread_mutex_trylock(&list->first->mutex) == EBUSY) {
-                pthread_mutex_unlock(mutex);
-                usleep(100);
-                continue;
-            }
+            pthread_mutex_lock(&list->first->mutex);
             iter = list->first;
             __sync_fetch_and_add(&list->swap_count, 1);
         } else {
-            if (pthread_mutex_trylock(&iter->next->mutex) == EBUSY) {
-                pthread_mutex_unlock(mutex);
-                usleep(100);
-                continue;
-            }
+            pthread_mutex_lock(&iter->next->mutex);
             iter = iter->next;
         }
         pthread_mutex_unlock(&iter->mutex);
