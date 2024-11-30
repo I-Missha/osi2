@@ -99,15 +99,9 @@ int list_add_last(list_t *l, char *str) {
 // min size of list should be 4
 // do not use swap_nodes on the last element, due to null in the second node
 void swap_nodes(lnode_t *first, lnode_t *second, lnode_t *parent) {
-    pthread_spin_lock(&parent->spinlock);
-    pthread_spin_lock(&first->spinlock);
-    pthread_spin_lock(&second->spinlock);
     parent->next = second;
     first->next = second->next;
     second->next = first;
-    pthread_spin_unlock(&parent->spinlock);
-    pthread_spin_unlock(&first->spinlock);
-    pthread_spin_unlock(&second->spinlock);
 }
 
 int list_get_first(list_t *l, int *val) {

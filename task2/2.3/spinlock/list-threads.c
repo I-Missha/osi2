@@ -67,13 +67,11 @@ void *thread_comparision(void *args) {
         pthread_spin_lock(spin);
         if (iter->next == NULL) {
             // the end of iteration over list
-            // ToDo: some work
             addOne(operation, list);
             pthread_spin_lock(&list->first->spinlock);
             iter = list->first;
         } else {
             pthread_spin_lock(&iter->next->spinlock);
-
             operation(iter, iter->next);
             iter = iter->next;
         }
@@ -90,14 +88,10 @@ void *swap_threads(void *args) {
     srand(time(NULL));
     lnode_t *iter = list->first;
     while (1) {
-        int r = rand() % RAND_MODULE;
-        if (r == RAND_SWAP && iter && iter->next && iter->next->next &&
-            iter->next->next->next) {
-            // swap_nodes(iter->next, iter->next->next, iter);
-        }
         pthread_spinlock_t *spin = &iter->spinlock;
         pthread_spin_lock(spin);
         if (iter->next == NULL) {
+            // the end of iteration over list
             pthread_spin_lock(&list->first->spinlock);
             iter = list->first;
             __sync_fetch_and_add(&list->swap_count, 1);
@@ -107,6 +101,17 @@ void *swap_threads(void *args) {
         }
         pthread_spin_unlock(&iter->spinlock);
         pthread_spin_unlock(spin);
+        int r = rand() % RAND_MODULE;
+        if (r == RAND_SWAP && iter->next && iter->next->next &&
+            iter->next->next->next) {
+            pthread_spin_lock(&iter->spinlock);
+            pthread_spin_lock(&iter->next->spinlock);
+            pthread_spin_lock(&iter->next->next->spinlock);
+            swap_nodes(iter->next, iter->next->next, iter);
+            pthread_spin_unlock(&iter->spinlock);
+            pthread_spin_unlock(&iter->next->spinlock);
+            pthread_spin_unlock(&iter->next->next->spinlock);
+        }
     }
     return 0;
 }
