@@ -53,7 +53,7 @@ int list_get(list_t *q, int *val) {
 
     *val = tmp->val;
     q->first = q->first->next;
-    pthread_mutex_destroy(&tmp->mutex);
+    pthread_rwlock_destroy(&tmp->rwlock);
     free(tmp);
 
     return 1;
@@ -81,7 +81,7 @@ int list_add_last(list_t *l, char *str) {
         printf("Cannot allocate memory for new node\n");
         abort();
     }
-    pthread_mutex_init(&new->mutex, NULL);
+    pthread_rwlock_init(&new->rwlock, NULL);
     strcpy(new->string, str);
     new->next = NULL;
     if (!l->first)

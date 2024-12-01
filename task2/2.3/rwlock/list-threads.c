@@ -63,19 +63,19 @@ void *thread_comparision(void *args) {
     int (*operation)(lnode_t *, lnode_t *) = thread_args->operation;
     lnode_t *iter = list->first;
     while (1) {
-        pthread_mutex_lock(&iter->mutex);
-        pthread_mutex_t *mutex = &iter->mutex;
+        pthread_rwlock_rdlock(&iter->rwlock);
+        pthread_rwlock_t *rwlock = &iter->rwlock;
         if (iter->next == NULL) {
-            pthread_mutex_lock(&list->first->mutex);
+            pthread_rwlock_rdlock(&list->first->rwlock);
             iter = list->first;
             addOne(operation, list);
         } else {
-            pthread_mutex_lock(&iter->next->mutex);
+            pthread_rwlock_rdlock(&iter->next->rwlock);
             operation(iter, iter->next);
             iter = iter->next;
         }
-        pthread_mutex_unlock(&iter->mutex);
-        pthread_mutex_unlock(mutex);
+        pthread_rwlock_unlock(&iter->rwlock);
+        pthread_rwlock_unlock(rwlock);
     }
     return 0;
 }
@@ -90,26 +90,26 @@ void *swap_threads(void *args) {
         int r = rand() % RAND_MODULE;
         if (r == RAND_SWAP && iter && iter->next && iter->next->next &&
             iter->next->next->next) {
-            pthread_mutex_lock(&iter->mutex);
-            pthread_mutex_lock(&iter->next->mutex);
-            pthread_mutex_lock(&iter->next->next->mutex);
+            pthread_rwlock_wrlock(&iter->rwlock);
+            pthread_rwlock_wrlock(&iter->next->rwlock);
+            pthread_rwlock_wrlock(&iter->next->next->rwlock);
             swap_nodes(iter->next, iter->next->next, iter);
-            pthread_mutex_unlock(&iter->next->next->mutex);
-            pthread_mutex_unlock(&iter->next->mutex);
-            pthread_mutex_unlock(&iter->mutex);
+            pthread_rwlock_unlock(&iter->next->next->rwlock);
+            pthread_rwlock_unlock(&iter->next->rwlock);
+            pthread_rwlock_unlock(&iter->rwlock);
         }
-        pthread_mutex_lock(&iter->mutex);
-        pthread_mutex_t *mutex = &iter->mutex;
+        pthread_rwlock_rdlock(&iter->rwlock);
+        pthread_rwlock_t *rwlock = &iter->rwlock;
         if (iter->next == NULL) {
-            pthread_mutex_lock(&list->first->mutex);
+            pthread_rwlock_rdlock(&list->first->rwlock);
             iter = list->first;
             __sync_fetch_and_add(&list->swap_count, 1);
         } else {
-            pthread_mutex_lock(&iter->next->mutex);
+            pthread_rwlock_rdlock(&iter->next->rwlock);
             iter = iter->next;
         }
-        pthread_mutex_unlock(&iter->mutex);
-        pthread_mutex_unlock(mutex);
+        pthread_rwlock_unlock(&iter->rwlock);
+        pthread_rwlock_unlock(rwlock);
     }
     return 0;
 }

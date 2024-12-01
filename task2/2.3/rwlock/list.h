@@ -14,7 +14,7 @@ typedef struct _ListNode {
     int val;
     struct _ListNode *next;
     char string[100];
-    pthread_mutex_t mutex;
+    pthread_rwlock_t rwlock;
 } lnode_t;
 
 typedef struct _List {
