@@ -3,6 +3,7 @@
 
 #include "custom_socket.h"
 #include <errno.h>
+#include <http_parser.h>
 #include <pthread.h>
 #include <string.h>
 #include <sys/socket.h>
