@@ -1,5 +1,14 @@
 #include "main.h"
 
+#define BUFFER_SIZE 4096 * 100
+
+void *client_handler(void *args) {
+    int client_fd = *(int *)args;
+    char *buffer = (char *)malloc(BUFFER_SIZE * sizeof(char));
+
+    int recieve_size = recv(client_fd, (void *)buffer, BUFFER_SIZE, 0);
+}
+
 int main() {
     int server_fd = create_server_fd(PROXY_PORT);
     if (server_fd == -1) {

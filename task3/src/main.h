@@ -2,8 +2,8 @@
 #define __PROXY__
 
 #include "custom_socket.h"
+#include "http_parser.h"
 #include <errno.h>
-#include <http_parser.h>
 #include <pthread.h>
 #include <string.h>
 #include <sys/socket.h>
