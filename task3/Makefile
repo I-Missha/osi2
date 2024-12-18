@@ -1,41 +1,39 @@
-# Определяем ОС (для информации)
-OS = Arch Linux
-
-# Компилятор и флаги
+# Указываем компилятор
 CC = gcc
-CFLAGS = -Wall -Wextra -g -O2 -march=native -I./llhttp/build # Добавляем путь к llhttp.h
-LDFLAGS = -L./llhttp/build -lllhttp                         # Указываем путь к libllhttp.a и ссылку на библиотеку
 
-# Папки
+# Флаги компиляции
+CFLAGS = -Wall -Wextra -I$(SRC_DIR) -Illhttp/build
+LDFLAGS = llhttp/build/libllhttp.a
+# Директории
 SRC_DIR = src
 BIN_DIR = bin
+LLHTTP_DIR = ../llhttp/build
 
-# Название выходного файла
+# Главный исполняемый файл
 TARGET = $(BIN_DIR)/main
 
 # Список исходных файлов
 SRCS = $(wildcard $(SRC_DIR)/*.c)
-
 # Список объектных файлов
 OBJS = $(SRCS:$(SRC_DIR)/%.c=$(BIN_DIR)/%.o)
 
 # Правило по умолчанию
 all: $(TARGET)
-	@echo "Building on $(OS)..."
 
-# Сборка исполняемого файла
+# Правило сборки исполняемого файла
 $(TARGET): $(OBJS)
 	@mkdir -p $(BIN_DIR)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+	$(CC) $(OBJS) $(LDFLAGS) -o $@
 
-# Компиляция объектных файлов
-$(BIN_DIR)/%.o: $(SRC_DIR)/%.c
+# Правило сборки объектных файлов
+$(BIN_DIR)/%.o: $(SRC_DIR)/%.c $(SRC_DIR)/%.h
 	@mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Очистка
+# Очистка проекта
 clean:
-	rm -rf $(BIN_DIR)
+	rm -rf $(BIN_DIR)/*.o $(TARGET)
 
-# Пересборка
-rebuild: clean all
+# Фиктивные цели
+.PHONY: all clean
+
