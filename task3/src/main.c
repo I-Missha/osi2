@@ -15,6 +15,7 @@ void *client_handler(void *arg) {
     parse_http_request(buffer, recieve_size);
     return NULL;
 }
+
 #define CONNECTIONS_LIMIT 1000
 int main() {
     int server_fd = create_server_fd(PROXY_PORT);
