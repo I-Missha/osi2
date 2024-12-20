@@ -1,3 +1,4 @@
 [submodule "task3/llhttp"]
 	path = task3/llhttp
-	url = https://github.com/nodejs/llhttp.git
+	url = https://github.com/nodejs/llhttp
+    branch = release
