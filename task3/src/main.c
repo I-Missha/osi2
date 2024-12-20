@@ -2,7 +2,7 @@
 #include "http_parser.h"
 
 #define BUFFER_SIZE 4096 * 100
-#define CONNECTIONS_LIMIT 1000
+#define p_resS_LIMIT 1000
 
 int is_acceptable_method(char *method) {}
 
@@ -12,11 +12,11 @@ void *client_handler(void *arg) {
 
     int recieve_size = recv(client_fd, (void *)buffer, BUFFER_SIZE, 0);
     llhttp_t parser;
-    connection_request con_req;
-    init_connection_request_structures(&parser, &con_req);
+    parser_res p_res;
+    init_parser_res_structures(&parser, &p_res);
     parse_http_request(&parser, buffer, recieve_size);
-    for (int i = 0; i < con_req.url_curr_size; i++) {
-        printf("%c", con_req.url[i]);
+    for (int i = 0; i < p_res.url_curr_size; i++) {
+        printf("%c", p_res.url[i]);
     }
     printf("%d", llhttp_get_method(&parser));
     return NULL;
@@ -24,7 +24,7 @@ void *client_handler(void *arg) {
 
 int main() {
     int server_fd = create_server_fd(PROXY_PORT);
-    int *client_connections = (int *)malloc(CONNECTIONS_LIMIT * sizeof(int));
+    int *client_p_ress = (int *)malloc(CONNECTIONS_LIMIT * sizeof(int));
     if (server_fd == -1) {
         perror(strerror(errno));
         return SOCKET_ERROR;
@@ -44,12 +44,12 @@ int main() {
             continue;
         }
         pthread_t thread_id;
-        client_connections[connections_counter] = client_fd;
+        client_p_ress[connections_counter] = client_fd;
         pthread_create(
             &thread_id,
             NULL,
             client_handler,
-            &client_connections[connections_counter]
+            &client_p_ress[connections_counter]
         );
         pthread_detach(thread_id);
         connections_counter++;
