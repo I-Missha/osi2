@@ -4,21 +4,21 @@
 #define BUFFER_SIZE 4096 * 100
 #define CONNECTIONS_LIMIT 1000
 
+int is_acceptable_method(char *method) {}
+
 void *client_handler(void *arg) {
     int client_fd = *(int *)arg;
     char *buffer = (char *)malloc(BUFFER_SIZE * sizeof(char));
 
     int recieve_size = recv(client_fd, (void *)buffer, BUFFER_SIZE, 0);
-    printf("something happening\n");
     llhttp_t parser;
     connection_request con_req;
-    printf("here\n");
     init_connection_request_structures(&parser, &con_req);
     parse_http_request(&parser, buffer, recieve_size);
     for (int i = 0; i < con_req.url_curr_size; i++) {
         printf("%c", con_req.url[i]);
     }
-    printf("\n");
+    printf("%d", llhttp_get_method(&parser));
     return NULL;
 }
 
@@ -43,7 +43,6 @@ int main() {
             perror(strerror(errno));
             continue;
         }
-        printf("new client connected %d\n", client_fd);
         pthread_t thread_id;
         client_connections[connections_counter] = client_fd;
         pthread_create(

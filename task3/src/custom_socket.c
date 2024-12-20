@@ -11,6 +11,7 @@ int create_server_fd(const int PORT) {
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = INADDR_ANY;
     server_addr.sin_port = htons(PORT);
+
     int reuse = 1;
     int result = setsockopt(
         server_fd, SOL_SOCKET, SO_REUSEADDR, (void *)&reuse, sizeof(reuse)

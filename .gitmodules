@@ -2,3 +2,6 @@
 	path = task3/llhttp
 	url = https://github.com/nodejs/llhttp.git
     branch = v8.x
+[submodule "task3/c-vector"]
+	path = task3/c-vector
+	url = https://github.com/Mashpoe/c-vector.git
