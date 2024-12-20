@@ -2,21 +2,26 @@
 #include "http_parser.h"
 
 #define BUFFER_SIZE 4096 * 100
+#define CONNECTIONS_LIMIT 1000
 
 void *client_handler(void *arg) {
-    printf("something happening\n");
     int client_fd = *(int *)arg;
-    printf("something happening\n");
     char *buffer = (char *)malloc(BUFFER_SIZE * sizeof(char));
 
-    printf("something happening\n");
     int recieve_size = recv(client_fd, (void *)buffer, BUFFER_SIZE, 0);
     printf("something happening\n");
-    parse_http_request(buffer, recieve_size);
+    llhttp_t parser;
+    connection_request con_req;
+    printf("here\n");
+    init_connection_request_structures(&parser, &con_req);
+    parse_http_request(&parser, buffer, recieve_size);
+    for (int i = 0; i < con_req.url_curr_size; i++) {
+        printf("%c", con_req.url[i]);
+    }
+    printf("\n");
     return NULL;
 }
 
-#define CONNECTIONS_LIMIT 1000
 int main() {
     int server_fd = create_server_fd(PROXY_PORT);
     int *client_connections = (int *)malloc(CONNECTIONS_LIMIT * sizeof(int));
