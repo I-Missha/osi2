@@ -1,20 +1,28 @@
 #include "main.h"
-#include "http_parser.h"
 
-int is_acceptable_method(char *method) {}
+int is_method_acceptable(Parser_res *p_res) {
+    llhttp_method_t method = p_res->method;
+    return method == HTTP_GET;
+}
 
-void vector_push_str(char *vec, char *str, int str_size) {
+int is_version_acceptable(Parser_res *p_res) {
+    uint8_t minor_version = p_res->minor_version;
+    uint8_t major_version = p_res->major_version;
+    return minor_version == 0 && major_version == 1;
+}
+
+void vector_push_str(char **vec, char *str, int str_size) {
     for (int i = 0; i < str_size; i++) {
-        vector_add(&vec, str[i]);
+        vector_add(vec, str[i]);
     }
 }
 
-int receive_parsed_request(int client_fd, llhttp_t *parser, parser_res *p_res) {
+int receive_parsed_request(int client_fd, llhttp_t *parser, Parser_res *p_res) {
     const ParseState state = ReqParsed;
     char *buff = malloc(BUFFER_SIZE);
     while (p_res->parseState != state) {
         int rec_size = read(client_fd, buff, BUFFER_SIZE);
-        vector_push_str(p_res->full_msg, buff, rec_size);
+        vector_push_str(&p_res->full_msg, buff, rec_size);
         if (parse_http_request(parser, buff, rec_size)) {
             return PARSE_ERROR;
         }
@@ -26,7 +34,7 @@ void *client_handler(void *arg) {
     int client_fd = *(int *)arg;
 
     llhttp_t parser;
-    parser_res p_res;
+    Parser_res p_res;
     init_request_parser(&parser, &p_res);
 
     if (receive_parsed_request(client_fd, &parser, &p_res)) {
@@ -35,9 +43,16 @@ void *client_handler(void *arg) {
         return NULL;
     }
 
+    if (!is_method_acceptable(&p_res) || !is_version_acceptable(&p_res)) {
+        destroy_request_parser(&parser, &p_res);
+        close(client_fd);
+        return NULL;
+    }
+
     for (int i = 0; i < vector_size(p_res.url); i++) {
         printf("%c", p_res.url[i]);
     }
+
     printf("\n%d\n", llhttp_get_method(&parser));
     return NULL;
 }

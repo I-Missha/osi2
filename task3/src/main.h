@@ -16,6 +16,6 @@
 #define PARSE_ERROR 2
 #define SUCCESS_PARSE 0
 
-#define BUFFER_SIZE 4096 * 100
+#define BUFFER_SIZE 4096 * 10
 #define p_resS_LIMIT 1000
 #endif

@@ -13,14 +13,17 @@ typedef enum ParseState {
     RespParsed,
 } ParseState;
 
-typedef struct parser_results_t {
+typedef struct Parser_results_t {
     ParseState parseState;
+    llhttp_method_t method;
+    uint8_t minor_version;
+    uint8_t major_version;
     char *full_msg;
     char *url;
-} parser_res;
+} Parser_res;
 
 int parse_http_request(llhttp_t *parser, const char *data, int data_len);
-void destroy_request_parser(llhttp_t *parser, parser_res *p_res);
-int init_request_parser(llhttp_t *parser, parser_res *p_res);
-int init_parser_res_structures(llhttp_t *parser, parser_res *con_req);
+void destroy_request_parser(llhttp_t *parser, Parser_res *p_res);
+int init_request_parser(llhttp_t *parser, Parser_res *p_res);
+int init_parser_res_structures(llhttp_t *parser, Parser_res *con_req);
 #endif // !__HTTP_PARSER__
