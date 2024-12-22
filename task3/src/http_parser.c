@@ -53,8 +53,10 @@ void destroy_request_parser(llhttp_t *parser, Parser_res *p_res) {
 }
 
 void http_parse_host_name(const char *url, char **host_name) {
+    int host_start = strlen("http://");
+
     printf("%s\n", url);
-    for (int i = host_start; i < vector_size(url); ++i) {
+    for (vec_size_t i = host_start; i < vector_size((void *)url); ++i) {
         vector_add(host_name, url[i]);
     }
 }
@@ -69,4 +71,23 @@ int parse_http_request(llhttp_t *parser, const char *data, int data_len) {
         return 1;
     }
     return 0;
+}
+
+void vector_push_str(char **vec, char *str, int str_size) {
+    for (int i = 0; i < str_size; i++) {
+        vector_add(vec, str[i]);
+    }
+}
+
+int receive_parsed_request(int client_fd, llhttp_t *parser, Parser_res *p_res) {
+    const ParseState state = ReqParsed;
+    char *buff = malloc(BUFFER_SIZE);
+    while (p_res->parseState != state) {
+        int rec_size = read(client_fd, buff, BUFFER_SIZE);
+        vector_push_str(&p_res->full_msg, buff, rec_size);
+        if (parse_http_request(parser, buff, rec_size)) {
+            return PARSE_ERROR;
+        }
+    }
+    return SUCCESS_PARSE;
 }

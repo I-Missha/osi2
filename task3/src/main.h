@@ -13,8 +13,6 @@
 #define CONNECTIONS_LIMIT 5040
 
 #define SOCKET_ERROR 1
-#define PARSE_ERROR 2
-#define SUCCESS_PARSE 0
 
 #define BUFFER_SIZE 4096 * 10
 #define p_resS_LIMIT 1000

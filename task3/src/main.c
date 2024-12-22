@@ -1,6 +1,5 @@
 #include "main.h"
-#include "http_parser.h"
-#include "llhttp.h"
+#include "custom_socket.h"
 #include "vec.h"
 
 int is_method_acceptable(Parser_res *p_res) {
@@ -12,25 +11,6 @@ int is_version_acceptable(Parser_res *p_res) {
     uint8_t minor_version = p_res->minor_version;
     uint8_t major_version = p_res->major_version;
     return (minor_version == 0 || minor_version == 1) && major_version == 1;
-}
-
-void vector_push_str(char **vec, char *str, int str_size) {
-    for (int i = 0; i < str_size; i++) {
-        vector_add(vec, str[i]);
-    }
-}
-
-int receive_parsed_request(int client_fd, llhttp_t *parser, Parser_res *p_res) {
-    const ParseState state = ReqParsed;
-    char *buff = malloc(BUFFER_SIZE);
-    while (p_res->parseState != state) {
-        int rec_size = read(client_fd, buff, BUFFER_SIZE);
-        vector_push_str(&p_res->full_msg, buff, rec_size);
-        if (parse_http_request(parser, buff, rec_size)) {
-            return PARSE_ERROR;
-        }
-    }
-    return SUCCESS_PARSE;
 }
 
 void *client_handler(void *arg) {
@@ -55,11 +35,37 @@ void *client_handler(void *arg) {
     char *host_name = vector_create();
     http_parse_host_name(p_res.url, &host_name);
 
-    for (int i = 0; i < vector_size(host_name); i++) {
-        printf("%c", host_name[i]);
+    int host_fd = connect_via_host_name(host_name);
+    if (host_fd > 0) {
+        destroy_request_parser(&parser, &p_res);
+        close(client_fd);
+        return NULL;
     }
 
-    printf("\n");
+    vec_size_t written_counter = 0;
+    vec_size_t to_write = vector_size(p_res.full_msg);
+    while (written_counter != to_write) {
+        int written = write(
+            host_fd,
+            p_res.full_msg + written_counter,
+            to_write - written_counter
+        );
+
+        if (written < 0) {
+            destroy_request_parser(&parser, &p_res);
+            close(client_fd);
+            close(host_fd);
+            return NULL;
+        }
+
+        written_counter += written;
+    }
+    /*printf("%s\n", p_res.full_msg);*/
+    /*for (int i = 0; i < vector_size(host_name); i++) {*/
+    /*    printf("%c", host_name[i]);*/
+    /*}*/
+    /**/
+    /*printf("\n");*/
     return NULL;
 }
 

@@ -16,10 +16,15 @@ int create_server_fd(const int PORT) {
     int result = setsockopt(
         server_fd, SOL_SOCKET, SO_REUSEADDR, (void *)&reuse, sizeof(reuse)
     );
+
+    if (result != 0) {
+        perror("server setsockopt failed\n");
+        return ERROR;
+    }
     int error =
         bind(server_fd, (struct sockaddr *)&server_addr, sizeof(server_addr));
     if (error == -1) {
-        perror("server bind server socket failed\n");
+        perror("server bind socket failed\n");
         return ERROR;
     }
 
@@ -29,4 +34,35 @@ int create_server_fd(const int PORT) {
     }
 
     return server_fd;
+}
+
+int connect_via_host_name(const char *host_name) {
+    struct addrinfo hints;
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    struct addrinfo *addr_arr;
+
+    if (!getaddrinfo(host_name, "http", &hints, &addr_arr)) {
+        perror("can not resolve host name\n");
+        return 1;
+    }
+
+    struct addrinfo *iter = addr_arr;
+    int host_fd;
+    while (iter != NULL) {
+        host_fd = socket(iter->ai_family, iter->ai_socktype, iter->ai_protocol);
+
+        if (host_fd < 0) {
+            iter = iter->ai_next;
+            continue;
+        }
+
+        if (connect(host_fd, iter->ai_addr, iter->ai_addrlen)) {
+            iter = iter->ai_next;
+            continue;
+        }
+
+        break;
+    }
+    return host_fd;
 }
