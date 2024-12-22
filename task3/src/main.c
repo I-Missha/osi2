@@ -1,24 +1,44 @@
 #include "main.h"
 #include "http_parser.h"
 
-#define BUFFER_SIZE 4096 * 100
-#define p_resS_LIMIT 1000
-
 int is_acceptable_method(char *method) {}
+
+void vector_push_str(char *vec, char *str, int str_size) {
+    for (int i = 0; i < str_size; i++) {
+        vector_add(&vec, str[i]);
+    }
+}
+
+int receive_parsed_request(int client_fd, llhttp_t *parser, parser_res *p_res) {
+    const ParseState state = ReqParsed;
+    char *buff = malloc(BUFFER_SIZE);
+    while (p_res->parseState != state) {
+        int rec_size = read(client_fd, buff, BUFFER_SIZE);
+        vector_push_str(p_res->full_msg, buff, rec_size);
+        if (parse_http_request(parser, buff, rec_size)) {
+            return PARSE_ERROR;
+        }
+    }
+    return SUCCESS_PARSE;
+}
 
 void *client_handler(void *arg) {
     int client_fd = *(int *)arg;
-    char *buffer = (char *)malloc(BUFFER_SIZE * sizeof(char));
 
-    int recieve_size = recv(client_fd, (void *)buffer, BUFFER_SIZE, 0);
     llhttp_t parser;
     parser_res p_res;
-    init_parser_res_structures(&parser, &p_res);
-    parse_http_request(&parser, buffer, recieve_size);
-    for (int i = 0; i < p_res.url_curr_size; i++) {
+    init_request_parser(&parser, &p_res);
+
+    if (receive_parsed_request(client_fd, &parser, &p_res)) {
+        destroy_request_parser(&parser, &p_res);
+        close(client_fd);
+        return NULL;
+    }
+
+    for (int i = 0; i < vector_size(p_res.url); i++) {
         printf("%c", p_res.url[i]);
     }
-    printf("%d", llhttp_get_method(&parser));
+    printf("\n%d\n", llhttp_get_method(&parser));
     return NULL;
 }
 

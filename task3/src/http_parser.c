@@ -1,47 +1,49 @@
 #include "http_parser.h"
 #include "llhttp.h"
-#include <stdint.h>
-#include <string.h>
+#include "vec.h"
 
-int on_url_complete(llhttp_t *parser) {
+/*int on_url_complete(llhttp_t *parser) {*/
+/*    parser_res *p_res = (parser_res *)parser->data;*/
+/*    p_res->isParsed = PARSED;*/
+/*    return 0;*/
+/*}*/
+
+int on_request_complete(llhttp_t *parser) {
     parser_res *p_res = (parser_res *)parser->data;
-    p_res->isParsed = PARSED;
+    const ParseState state = ReqParsed;
+    p_res->parseState = state;
     return 0;
-}
-void reallocate_mem(char **ptr, int new_size) {
-
-    char *to_free = *ptr;
-    *ptr = malloc(new_size * ALLOCATION_RATIO);
-    strcpy(*ptr, to_free);
-    free(to_free);
 }
 
 int on_url(llhttp_t *parser, const char *url_part, uint64_t addition_size) {
-    parser_res *p_res = parser->data;
-    char *url = p_res->url;
-    int url_curr_size = p_res->url_curr_size;
-    // todo: delete
-    /*if (!url) {*/
-    /*    p_res->url = (char *)malloc(sizeof(char) * URL_LIMIT);*/
-    /*    url = p_res->url;*/
-    /*}*/
+    parser_res *parser_res = parser->data;
     for (uint64_t i = 0; i < addition_size; i++) {
-        url[i + url_curr_size] = url_part[i];
+        vector_add(&parser_res->url, url_part[i]);
     }
-    p_res->url_curr_size += addition_size;
     return 0;
 }
 
-int init_parser_res_structures(llhttp_t *parser, parser_res *con_req) {
+int init_request_parser(llhttp_t *parser, parser_res *p_res) {
     static llhttp_settings_t settings;
+
     llhttp_settings_init(&settings);
     settings.on_url = on_url;
-    settings.on_url_complete = on_url_complete;
-    con_req->url = (char *)malloc(sizeof(char) * URL_LIMIT);
-    con_req->url_buff_size = URL_LIMIT;
-    llhttp_init(parser, HTTP_BOTH, &settings);
-    parser->data = con_req;
+    settings.on_message_complete = on_request_complete;
+
+    p_res->url = vector_create();
+    p_res->full_msg = vector_create();
+    const ParseState state = NotParsed;
+    p_res->parseState = state;
+
+    llhttp_init(parser, HTTP_REQUEST, &settings);
+    parser->data = p_res;
     return 0;
+}
+
+void destroy_request_parser(llhttp_t *parser, parser_res *p_res) {
+    llhttp_finish(parser);
+    vector_free(p_res->full_msg);
+    vector_free(p_res->url);
 }
 
 int parse_http_request(llhttp_t *parser, const char *data, int data_len) {
