@@ -1,11 +1,5 @@
 #include "http_parser.h"
 
-/*int on_url_complete(llhttp_t *parser) {*/
-/*    parser_res *p_res = (parser_res *)parser->data;*/
-/*    p_res->isParsed = PARSED;*/
-/*    return 0;*/
-/*}*/
-
 int on_request_complete(llhttp_t *parser) {
     Parser_res *p_res = (Parser_res *)parser->data;
     const ParseState state = ReqParsed;

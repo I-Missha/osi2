@@ -8,7 +8,7 @@ int is_method_acceptable(Parser_res *p_res) {
 int is_version_acceptable(Parser_res *p_res) {
     uint8_t minor_version = p_res->minor_version;
     uint8_t major_version = p_res->major_version;
-    return minor_version == 0 && major_version == 1;
+    return (minor_version == 0 || minor_version == 1) && major_version == 1;
 }
 
 void vector_push_str(char **vec, char *str, int str_size) {
@@ -43,6 +43,7 @@ void *client_handler(void *arg) {
         return NULL;
     }
 
+    printf("%d\n", llhttp_get_method(&parser));
     if (!is_method_acceptable(&p_res) || !is_version_acceptable(&p_res)) {
         destroy_request_parser(&parser, &p_res);
         close(client_fd);
@@ -53,7 +54,6 @@ void *client_handler(void *arg) {
         printf("%c", p_res.url[i]);
     }
 
-    printf("\n%d\n", llhttp_get_method(&parser));
     return NULL;
 }
 
