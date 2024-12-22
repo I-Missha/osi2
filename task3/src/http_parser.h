@@ -22,6 +22,7 @@ typedef struct Parser_results_t {
     char *url;
 } Parser_res;
 
+void http_parse_host_name(const char *url, char **host_name);
 int parse_http_request(llhttp_t *parser, const char *data, int data_len);
 void destroy_request_parser(llhttp_t *parser, Parser_res *p_res);
 int init_request_parser(llhttp_t *parser, Parser_res *p_res);

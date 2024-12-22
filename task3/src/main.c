@@ -1,4 +1,7 @@
 #include "main.h"
+#include "http_parser.h"
+#include "llhttp.h"
+#include "vec.h"
 
 int is_method_acceptable(Parser_res *p_res) {
     llhttp_method_t method = p_res->method;
@@ -43,17 +46,20 @@ void *client_handler(void *arg) {
         return NULL;
     }
 
-    printf("%d\n", llhttp_get_method(&parser));
-    if (!is_method_acceptable(&p_res) || !is_version_acceptable(&p_res)) {
+    // || !is_version_acceptable(&p_res)
+    if (!is_method_acceptable(&p_res)) {
         destroy_request_parser(&parser, &p_res);
         close(client_fd);
         return NULL;
     }
+    char *host_name = vector_create();
+    http_parse_host_name(p_res.url, &host_name);
 
-    for (int i = 0; i < vector_size(p_res.url); i++) {
-        printf("%c", p_res.url[i]);
+    for (int i = 0; i < vector_size(host_name); i++) {
+        printf("%c", host_name[i]);
     }
 
+    printf("\n");
     return NULL;
 }
 

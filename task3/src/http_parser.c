@@ -52,6 +52,13 @@ void destroy_request_parser(llhttp_t *parser, Parser_res *p_res) {
     vector_free(p_res->url);
 }
 
+void http_parse_host_name(const char *url, char **host_name) {
+    printf("%s\n", url);
+    for (int i = host_start; i < vector_size(url); ++i) {
+        vector_add(host_name, url[i]);
+    }
+}
+
 int parse_http_request(llhttp_t *parser, const char *data, int data_len) {
     if (!parser || !data) {
         return 1;
