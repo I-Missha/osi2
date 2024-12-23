@@ -52,7 +52,7 @@ int connect_via_host_name(const char *host_name) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(err));
         perror("can not resolve host name");
         freeaddrinfo(addr_arr);
-        return 1;
+        return -1;
     }
 
     struct addrinfo *iter = addr_arr;
@@ -68,7 +68,6 @@ int connect_via_host_name(const char *host_name) {
             /*    iter->ai_protocol*/
             /*);*/
             /**/
-            printf("here\n");
             iter = iter->ai_next;
             continue;
         }

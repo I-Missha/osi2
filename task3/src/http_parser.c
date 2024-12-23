@@ -3,7 +3,7 @@
 
 int on_request_complete(llhttp_t *parser) {
     Parser_res *p_res = (Parser_res *)parser->data;
-    const ParseState state = ReqParsed;
+    const ParseState state = Parsed;
     p_res->parseState = state;
     return 0;
 }
@@ -29,7 +29,9 @@ int on_url(llhttp_t *parser, const char *url_part, uint64_t addition_size) {
     return 0;
 }
 
-int init_request_parser(llhttp_t *parser, Parser_res *p_res) {
+int init_request_parser(
+    llhttp_t *parser, Parser_res *p_res, llhttp_type_t http_type
+) {
     static llhttp_settings_t settings;
 
     llhttp_settings_init(&settings);
@@ -43,7 +45,7 @@ int init_request_parser(llhttp_t *parser, Parser_res *p_res) {
     const ParseState state = NotParsed;
     p_res->parseState = state;
 
-    llhttp_init(parser, HTTP_REQUEST, &settings);
+    llhttp_init(parser, http_type, &settings);
     parser->data = p_res;
     return 0;
 }
@@ -90,7 +92,7 @@ void vector_push_str(char **vec, char *str, int str_size) {
 }
 
 int receive_parsed_request(int client_fd, llhttp_t *parser, Parser_res *p_res) {
-    const ParseState state = ReqParsed;
+    const ParseState state = Parsed;
     char *buff = malloc(BUFFER_SIZE);
     while (p_res->parseState != state) {
         int rec_size = read(client_fd, buff, BUFFER_SIZE);
