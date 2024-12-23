@@ -1,4 +1,7 @@
 #include "custom_socket.h"
+#include <errno.h>
+#include <error.h>
+#include <string.h>
 
 int create_server_fd(const int PORT) {
     int server_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -37,13 +40,18 @@ int create_server_fd(const int PORT) {
 }
 
 int connect_via_host_name(const char *host_name) {
-    struct addrinfo hints;
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
+    struct addrinfo hints = {
+        .ai_family = AF_INET,
+        .ai_socktype = SOCK_STREAM,
+    };
+
     struct addrinfo *addr_arr;
 
-    if (!getaddrinfo(host_name, "http", &hints, &addr_arr)) {
-        perror("can not resolve host name\n");
+    int err = getaddrinfo(host_name, "http", &hints, &addr_arr);
+    if (err != 0) {
+        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(err));
+        perror("can not resolve host name");
+        freeaddrinfo(addr_arr);
         return 1;
     }
 
@@ -53,16 +61,23 @@ int connect_via_host_name(const char *host_name) {
         host_fd = socket(iter->ai_family, iter->ai_socktype, iter->ai_protocol);
 
         if (host_fd < 0) {
+            /*printf(*/
+            /*    "here %d\n%d\n%d\n",*/
+            /*    iter->ai_family,*/
+            /*    iter->ai_socktype,*/
+            /*    iter->ai_protocol*/
+            /*);*/
+            /**/
+            printf("here\n");
             iter = iter->ai_next;
             continue;
         }
 
-        if (connect(host_fd, iter->ai_addr, iter->ai_addrlen)) {
-            iter = iter->ai_next;
-            continue;
+        if (connect(host_fd, iter->ai_addr, iter->ai_addrlen) != -1) {
+            break;
         }
 
-        break;
+        iter = iter->ai_next;
     }
     return host_fd;
 }

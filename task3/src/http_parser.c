@@ -1,4 +1,5 @@
 #include "http_parser.h"
+#include "vec.h"
 
 int on_request_complete(llhttp_t *parser) {
     Parser_res *p_res = (Parser_res *)parser->data;
@@ -35,6 +36,7 @@ int init_request_parser(llhttp_t *parser, Parser_res *p_res) {
     settings.on_url = on_url;
     settings.on_message_complete = on_request_complete;
     settings.on_method_complete = on_method_complete;
+    settings.on_version_complete = on_version_complete;
 
     p_res->full_msg = vector_create();
     p_res->url = vector_create();
@@ -53,12 +55,20 @@ void destroy_request_parser(llhttp_t *parser, Parser_res *p_res) {
 }
 
 void http_parse_host_name(const char *url, char **host_name) {
-    int host_start = strlen("http://");
-
-    printf("%s\n", url);
-    for (vec_size_t i = host_start; i < vector_size((void *)url); ++i) {
-        vector_add(host_name, url[i]);
+    const char *start = strstr(url, "http://");
+    if (start) {
+        start += strlen("http://");
+    } else {
+        start = url;
     }
+    const char *end = strchr(start, '/'); // Find the first '/' after the host
+
+    for (const char *ptr = start; ptr != end && *ptr != '\0'; ++ptr) {
+        vector_add(host_name, *ptr);
+    }
+
+    vector_add(host_name, '\0');
+    printf("%s\n", *host_name);
 }
 
 int parse_http_request(llhttp_t *parser, const char *data, int data_len) {

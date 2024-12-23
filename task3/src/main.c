@@ -1,6 +1,4 @@
 #include "main.h"
-#include "custom_socket.h"
-#include "vec.h"
 
 int is_method_acceptable(Parser_res *p_res) {
     llhttp_method_t method = p_res->method;
@@ -26,8 +24,7 @@ void *client_handler(void *arg) {
         return NULL;
     }
 
-    // || !is_version_acceptable(&p_res)
-    if (!is_method_acceptable(&p_res)) {
+    if (!is_method_acceptable(&p_res) || !is_version_acceptable(&p_res)) {
         destroy_request_parser(&parser, &p_res);
         close(client_fd);
         return NULL;
