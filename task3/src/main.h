@@ -1,6 +1,7 @@
 #ifndef __PROXY__
 #define __PROXY__
 
+#include "cache.h"
 #include "custom_socket.h"
 #include "http_parser.h"
 #include <errno.h>

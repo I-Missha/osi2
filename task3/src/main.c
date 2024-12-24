@@ -1,4 +1,6 @@
 #include "main.h"
+#include "cache.h"
+#include "http_parser.h"
 #include <bits/pthreadtypes.h>
 
 int is_method_acceptable(Parser_res *p_res) {
@@ -12,40 +14,53 @@ int is_version_acceptable(Parser_res *p_res) {
     return (minor_version == 0 || minor_version == 1) && major_version == 1;
 }
 
-typedef struct server_args {
+typedef struct hashmap hashmap;
+
+typedef struct ServerArgs {
     int server_fd;
-    char **server_ans;
-    int *isParsed;
-} server_args;
+    ParseState *state;
+    Pair_t *pair;
+    hashmap *cache;
+} ServerArgs;
 
 void *server_handler(void *arg) {
-    server_args *args = (server_args *)arg;
+    ServerArgs *args = (ServerArgs *)arg;
+    Pair_t *pair = args->pair;
 
     llhttp_t parser;
     Parser_res p_res;
     init_request_parser(&parser, &p_res, HTTP_RESPONSE);
     int server_fd = args->server_fd;
 
-    char **server_ans = args->server_ans;
+    // create cache entry
+
+    char **server_ans = &pair->entry->content;
     const ParseState state = Parsed;
     char *buff = malloc(BUFFER_SIZE);
+
+    // now i need to receive content
     while (p_res.parseState != state) {
         int rec_size = read(server_fd, buff, BUFFER_SIZE);
+
         vector_push_str(&p_res.full_msg, buff, rec_size);
         if (parse_http_request(&parser, buff, rec_size)) {
             return NULL;
         }
-    }
-    for (int i = 0; i < vector_size(p_res.full_msg); i++) {
-        vector_add(server_ans, p_res.full_msg[i]);
     }
     *args->isParsed = 1;
     destroy_request_parser(&parser, &p_res);
     return NULL;
 }
 
+typedef struct ClientArgs {
+    int client_fd;
+    hashmap *cache;
+} ClientArgs;
+
 void *client_handler(void *arg) {
-    int client_fd = *(int *)arg;
+    ClientArgs *client_args = (ClientArgs *)arg;
+    int client_fd = client_args->client_fd;
+    hashmap *cache = client_args->cache;
 
     llhttp_t parser;
     Parser_res p_res;
@@ -54,6 +69,7 @@ void *client_handler(void *arg) {
     if (receive_parsed_request(client_fd, &parser, &p_res)) {
         destroy_request_parser(&parser, &p_res);
         close(client_fd);
+        free(client_args);
         return NULL;
     }
 
@@ -69,6 +85,7 @@ void *client_handler(void *arg) {
     if (host_fd < 0) {
         destroy_request_parser(&parser, &p_res);
         close(client_fd);
+        free(client_args);
         return NULL;
     }
 
@@ -85,6 +102,7 @@ void *client_handler(void *arg) {
             destroy_request_parser(&parser, &p_res);
             close(client_fd);
             close(host_fd);
+            free(client_args);
             return NULL;
         }
 
@@ -96,46 +114,48 @@ void *client_handler(void *arg) {
     /*}*/
     /**/
     /*printf("\n");*/
-
+    // writing inition of server args
     pthread_t thread_id;
-    char *server_ans = vector_create();
-    int isParsed = 0;
-    server_args args = {host_fd, &server_ans, &isParsed};
-    pthread_create(&thread_id, NULL, server_handler, &args);
-    pthread_join(thread_id, NULL);
 
-    printf("%s\n", server_ans);
-    written_counter = 0;
-    to_write = vector_size(server_ans);
-    while (written_counter != to_write) {
-        int written = write(
-            client_fd, server_ans + written_counter, to_write - written_counter
-        );
-
-        if (written < 0) {
-            destroy_request_parser(&parser, &p_res);
-            close(client_fd);
-            close(host_fd);
-            return NULL;
-        }
-
-        written_counter += written;
-    }
-    destroy_request_parser(&parser, &p_res);
-    close(client_fd);
-    close(host_fd);
+    ParseState server_parse_state = NotParsed;
+    Pair_t *pair = create_pair(p_res.url);
+    ServerArgs args = {host_fd, &server_parse_state, pair, cache};
+    /*pthread_create(&thread_id, NULL, server_handler, &args);*/
+    /*pthread_join(thread_id, NULL);*/
+    /**/
+    /*printf("%s\n", server_ans);*/
+    /*written_counter = 0;*/
+    /*to_write = vector_size(server_ans);*/
+    /*while (written_counter != to_write) {*/
+    /*    int written = write(*/
+    /*        client_fd, server_ans + written_counter, to_write -
+     * written_counter*/
+    /*    );*/
+    /**/
+    /*    if (written < 0) {*/
+    /*        destroy_request_parser(&parser, &p_res);*/
+    /*        close(client_fd);*/
+    /*        close(host_fd);*/
+    /*        return NULL;*/
+    /*    }*/
+    /**/
+    /*    written_counter += written;*/
+    /*}*/
+    /*destroy_request_parser(&parser, &p_res);*/
+    /*close(client_fd);*/
+    /*close(host_fd);*/
+    free(client_args);
     return NULL;
 }
 
 int main() {
     int server_fd = create_server_fd(PROXY_PORT);
-    int *client_p_ress = (int *)malloc(CONNECTIONS_LIMIT * sizeof(int));
     if (server_fd == -1) {
         perror(strerror(errno));
         return SOCKET_ERROR;
     }
 
-    int connections_counter = 0;
+    hashmap *cache = create_cache();
     while (1) {
         struct sockaddr_in client_addr;
         socklen_t client_addr_size = sizeof(client_addr);
@@ -149,15 +169,12 @@ int main() {
             continue;
         }
         pthread_t thread_id;
-        client_p_ress[connections_counter] = client_fd;
-        pthread_create(
-            &thread_id,
-            NULL,
-            client_handler,
-            &client_p_ress[connections_counter]
-        );
+        ClientArgs *client_args = (ClientArgs *)malloc(sizeof(ClientArgs));
+        client_args->client_fd = client_fd;
+        // write inition of cache
+        client_args->cache = cache;
+        pthread_create(&thread_id, NULL, client_handler, client_args);
         pthread_detach(thread_id);
-        connections_counter++;
         sleep(10);
     }
     return 0;

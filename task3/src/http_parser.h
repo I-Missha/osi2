@@ -16,7 +16,7 @@ typedef enum ParseState {
     Parsed,
 } ParseState;
 
-typedef struct Parser_results_t {
+typedef struct ParserResults_t {
     ParseState parseState;
     llhttp_method_t method;
     uint8_t minor_version;
