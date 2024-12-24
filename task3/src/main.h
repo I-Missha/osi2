@@ -5,6 +5,7 @@
 #include "http_parser.h"
 #include "vec.h"
 #include <errno.h>
+#include <llhttp.h>
 #include <pthread.h>
 #include <string.h>
 #include <sys/socket.h>

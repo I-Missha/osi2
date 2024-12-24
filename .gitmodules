@@ -2,3 +2,12 @@
 	path = task3/llhttp
 	url = https://github.com/nodejs/llhttp.git
     branch = v8.x
+[submodule "task3/hashmap.c"]
+	path = task3/hashmap.c
+	url = https://github.com/tidwall/hashmap.c.git
+[submodule "task3/--force"]
+	path = task3/--force
+	url = https://github.com/Mashpoe/c-vector.git
+[submodule "task3/c-vector"]
+	path = task3/c-vector
+	url = https://github.com/Mashpoe/c-vector.git

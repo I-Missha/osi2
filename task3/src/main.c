@@ -1,6 +1,4 @@
 #include "main.h"
-#include "llhttp.h"
-#include "vec.h"
 #include <bits/pthreadtypes.h>
 
 int is_method_acceptable(Parser_res *p_res) {

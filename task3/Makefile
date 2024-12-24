@@ -2,20 +2,23 @@
 CC = gcc
 
 # Флаги компиляции
-CFLAGS = -Wall -Wextra -I$(SRC_DIR) -Illhttp/build
-LDFLAGS = llhttp/build/libllhttp.a
+CFLAGS = -Wall -Wextra -I$(SRC_DIR) -I$(LLHTTP_DIR) -I$(VECTOR_DIR) -I$(HASHMAP_DIR)
+LDFLAGS = $(LLHTTP_DIR)/libllhttp.a
+
 # Директории
 SRC_DIR = src
 BIN_DIR = bin
-LLHTTP_DIR = ../llhttp/build
+LLHTTP_DIR = llhttp/build
+VECTOR_DIR = c-vector
+HASHMAP_DIR = hashmap.c
 
 # Главный исполняемый файл
 TARGET = $(BIN_DIR)/main
 
 # Список исходных файлов
-SRCS = $(wildcard $(SRC_DIR)/*.c)
+SRCS = $(wildcard $(SRC_DIR)/*.c $(VECTOR_DIR)/*.c $(HASHMAP_DIR)/*.c)
 # Список объектных файлов
-OBJS = $(SRCS:$(SRC_DIR)/%.c=$(BIN_DIR)/%.o)
+OBJS = $(SRCS:%.c=$(BIN_DIR)/%.o)
 
 # Правило по умолчанию
 all: $(TARGET)
@@ -26,8 +29,8 @@ $(TARGET): $(OBJS)
 	$(CC) $(OBJS) $(LDFLAGS) -o $@
 
 # Правило сборки объектных файлов
-$(BIN_DIR)/%.o: $(SRC_DIR)/%.c $(SRC_DIR)/%.h
-	@mkdir -p $(BIN_DIR)
+$(BIN_DIR)/%.o: %.c
+	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Очистка проекта
