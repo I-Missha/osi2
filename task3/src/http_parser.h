@@ -1,6 +1,5 @@
 #ifndef __HTTP_PARSER__
 #define __HTTP_PARSER__
-#include "vec.h"
 #include <llhttp.h>
 #include <stdint.h>
 #include <stdio.h>

@@ -1,0 +1,20 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-Wall",
+      "-Wextra",
+      "-Isrc",
+      "-Illhttp/build",
+      "-Ic-vector",
+      "-Ihashmap.c",
+      "-c",
+      "-o",
+      "bin/src/main.o",
+      "src/main.c"
+    ],
+    "directory": "/home/mike/nsu/osi2/task3",
+    "file": "/home/mike/nsu/osi2/task3/src/main.c",
+    "output": "/home/mike/nsu/osi2/task3/bin/src/main.o"
+  }
+]
