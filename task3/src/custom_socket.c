@@ -62,13 +62,6 @@ int connect_via_host_name(const char *host_name) {
         host_fd = socket(iter->ai_family, iter->ai_socktype, iter->ai_protocol);
 
         if (host_fd < 0) {
-            /*printf(*/
-            /*    "here %d\n%d\n%d\n",*/
-            /*    iter->ai_family,*/
-            /*    iter->ai_socktype,*/
-            /*    iter->ai_protocol*/
-            /*);*/
-            /**/
             iter = iter->ai_next;
             continue;
         }

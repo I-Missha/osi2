@@ -39,20 +39,33 @@ int on_url(llhttp_t *parser, const char *url_part, uint64_t addition_size) {
     return 0;
 }
 
-int init_request_parser(
-    llhttp_t *parser, Parser_res *p_res, llhttp_type_t http_type
+int init_parser(
+    llhttp_t *parser,
+    Parser_res *p_res,
+    llhttp_type_t http_type,
+    char *full_msg,
+    char *url
 ) {
     static llhttp_settings_t settings;
 
     llhttp_settings_init(&settings);
     settings.on_url = on_url;
-    settings.on_url_complete = settings.on_message_complete =
-        on_message_complete;
+    settings.on_url_complete = on_message_complete;
     settings.on_method_complete = on_method_complete;
     settings.on_version_complete = on_version_complete;
 
-    p_res->full_msg = vector_create();
-    p_res->url = vector_create();
+    if (!full_msg) {
+        p_res->full_msg = vector_create();
+    } else {
+        p_res->full_msg = full_msg;
+    }
+
+    if (!url) {
+        p_res->url = vector_create();
+    } else {
+        p_res->url = url;
+    }
+
     const ParseState state = NotParsed;
     p_res->parseStateMsg = state;
     p_res->parseStateMethod = state;
@@ -64,7 +77,7 @@ int init_request_parser(
     return 0;
 }
 
-void destroy_request_parser(llhttp_t *parser, Parser_res *p_res) {
+void destroy_parser(llhttp_t *parser, Parser_res *p_res) {
     vector_free(p_res->full_msg);
     llhttp_finish(parser);
     vector_free(p_res->url);
@@ -87,7 +100,7 @@ void http_parse_host_name(const char *url, char **host_name) {
     printf("%s\n", *host_name);
 }
 
-int parse_http_request(llhttp_t *parser, const char *data, int data_len) {
+int parse_http(llhttp_t *parser, const char *data, int data_len) {
     if (!parser || !data) {
         return 1;
     }
@@ -131,7 +144,7 @@ int receive_parsed_request(int client_fd, llhttp_t *parser, Parser_res *p_res) {
             return PARSE_ERROR;
         }
 
-        if (parse_http_request(parser, buff, rec_size)) {
+        if (parse_http(parser, buff, rec_size)) {
             return PARSE_ERROR;
         }
     }

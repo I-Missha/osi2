@@ -18,7 +18,8 @@ Entry *create_entry(char *url) {
     // tricky moment with url due to address of var
     entry->url = vector_copy(url);
     entry->content = vector_create();
-    entry->max_capacity = MAX_CAPACITY;
+    entry->curr_size = 0;
+    entry->is_full_content = 0;
     pthread_mutex_init(&entry->mutex, NULL);
     pthread_cond_init(&entry->cond, NULL);
     pthread_rwlock_init(&entry->lock, NULL);
@@ -48,8 +49,10 @@ void destroy_pair(Pair_t *pair) {
     free(pair);
 }
 
-struct hashmap *create_cache() {
-    return hashmap_new(
-        sizeof(Pair_t), 0, 0, 0, my_hash, my_compare, NULL, NULL
-    );
+Cache *create_cache() {
+    Cache *cache = (Cache *)malloc(sizeof(Cache));
+    cache->cache =
+        hashmap_new(sizeof(Pair_t), 0, 0, 0, my_hash, my_compare, NULL, NULL);
+    cache->curr_size = 0;
+    return cache;
 }
