@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <vec.h>
 
 #define PARSE_ERROR 2
 #define SUCCESS_PARSE 0
@@ -13,11 +14,17 @@
 
 typedef enum ParseState {
     NotParsed,
-    Parsed,
+    MsgParsed,
+    UrlParsed,
+    MethodParsed,
+    VersionParsed,
 } ParseState;
 
 typedef struct ParserResults_t {
-    ParseState parseState;
+    ParseState parseStateMsg;
+    ParseState parseStateUrl;
+    ParseState parseStateMethod;
+    ParseState parseStateVersion;
     llhttp_method_t method;
     uint8_t minor_version;
     uint8_t major_version;

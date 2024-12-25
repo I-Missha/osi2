@@ -1,21 +1,31 @@
 #include "http_parser.h"
-#include "vec.h"
 
-int on_request_complete(llhttp_t *parser) {
+int on_url_complete(llhttp_t *parser) {
     Parser_res *p_res = (Parser_res *)parser->data;
-    const ParseState state = Parsed;
-    p_res->parseState = state;
+    const ParseState state = UrlParsed;
+    p_res->parseStateUrl = state;
+    return 0;
+}
+
+int on_message_complete(llhttp_t *parser) {
+    Parser_res *p_res = (Parser_res *)parser->data;
+    const ParseState state = MsgParsed;
+    p_res->parseStateMsg = state;
     return 0;
 }
 
 int on_method_complete(llhttp_t *parser) {
     Parser_res *parser_res = parser->data;
+    const ParseState state = MethodParsed;
+    parser_res->parseStateMsg = state;
     parser_res->method = llhttp_get_method(parser);
     return 0;
 }
 
 int on_version_complete(llhttp_t *parser) {
     Parser_res *parser_res = parser->data;
+    const ParseState state = VersionParsed;
+    parser_res->parseStateMsg = state;
     parser_res->major_version = llhttp_get_http_major(parser);
     parser_res->minor_version = llhttp_get_http_minor(parser);
     return 0;
@@ -36,14 +46,18 @@ int init_request_parser(
 
     llhttp_settings_init(&settings);
     settings.on_url = on_url;
-    settings.on_message_complete = on_request_complete;
+    settings.on_url_complete = settings.on_message_complete =
+        on_message_complete;
     settings.on_method_complete = on_method_complete;
     settings.on_version_complete = on_version_complete;
 
     p_res->full_msg = vector_create();
     p_res->url = vector_create();
     const ParseState state = NotParsed;
-    p_res->parseState = state;
+    p_res->parseStateMsg = state;
+    p_res->parseStateMethod = state;
+    p_res->parseStateVersion = state;
+    p_res->parseStateUrl = state;
 
     llhttp_init(parser, http_type, &settings);
     parser->data = p_res;
@@ -91,12 +105,32 @@ void vector_push_str(char **vec, char *str, int str_size) {
     }
 }
 
+int is_method_acceptable(Parser_res *p_res) {
+    llhttp_method_t method = p_res->method;
+    return method == HTTP_GET;
+}
+
+int is_version_acceptable(Parser_res *p_res) {
+    uint8_t minor_version = p_res->minor_version;
+    uint8_t major_version = p_res->major_version;
+    return (minor_version == 0 || minor_version == 1) && major_version == 1;
+}
+
 int receive_parsed_request(int client_fd, llhttp_t *parser, Parser_res *p_res) {
-    const ParseState state = Parsed;
     char *buff = malloc(BUFFER_SIZE);
-    while (p_res->parseState != state) {
+    while (p_res->parseStateMsg != MsgParsed) {
         int rec_size = read(client_fd, buff, BUFFER_SIZE);
         vector_push_str(&p_res->full_msg, buff, rec_size);
+        if (p_res->parseStateVersion == VersionParsed &&
+            !is_version_acceptable(p_res)) {
+            return PARSE_ERROR;
+        }
+
+        if (p_res->parseStateMethod == MethodParsed &&
+            !is_method_acceptable(p_res)) {
+            return PARSE_ERROR;
+        }
+
         if (parse_http_request(parser, buff, rec_size)) {
             return PARSE_ERROR;
         }

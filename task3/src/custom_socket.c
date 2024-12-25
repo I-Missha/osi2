@@ -24,6 +24,7 @@ int create_server_fd(const int PORT) {
         perror("server setsockopt failed\n");
         return ERROR;
     }
+
     int error =
         bind(server_fd, (struct sockaddr *)&server_addr, sizeof(server_addr));
     if (error == -1) {

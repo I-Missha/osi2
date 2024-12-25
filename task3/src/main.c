@@ -3,17 +3,6 @@
 #include "http_parser.h"
 #include <bits/pthreadtypes.h>
 
-int is_method_acceptable(Parser_res *p_res) {
-    llhttp_method_t method = p_res->method;
-    return method == HTTP_GET;
-}
-
-int is_version_acceptable(Parser_res *p_res) {
-    uint8_t minor_version = p_res->minor_version;
-    uint8_t major_version = p_res->major_version;
-    return (minor_version == 0 || minor_version == 1) && major_version == 1;
-}
-
 typedef struct hashmap hashmap;
 
 typedef struct ServerArgs {
