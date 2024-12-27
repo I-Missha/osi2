@@ -137,16 +137,11 @@ void *client_handler(void *arg) {
     const Pair_t *pair_cached =
         hashmap_get(cache->cache, &(Pair_t){.url = p_res.url});
 
-    if (pair_cached && pair_cached->entry->is_full_content) {
+    if (pair_cached) {
         send_cached_content(pair_cached, client_fd);
         close(client_fd);
         free(client_args);
         return NULL;
-    }
-
-    // if it is not full package just update full content
-    if (pair_cached && !pair_cached->entry->is_full_content) {
-        destroy_pair(pair_cached);
     }
 
     char *host_name = vector_create();
