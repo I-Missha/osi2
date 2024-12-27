@@ -1,4 +1,5 @@
 #include "cache.h"
+#include "vec.h"
 
 /*int insert_entry() {}*/
 int my_compare(const void *a, const void *b, void *udate) {
@@ -34,6 +35,8 @@ Entry *create_entry(char *url) {
     entry->content = create_vector_handler();
     entry->curr_size = 0;
     entry->is_full_content = 0;
+    entry->is_corresponds_to_cache_size = 1;
+    entry->time_counter = 0;
     pthread_mutex_init(&entry->mutex, NULL);
     pthread_cond_init(&entry->cond, NULL);
     pthread_rwlock_init(&entry->lock, NULL);
@@ -41,7 +44,7 @@ Entry *create_entry(char *url) {
 }
 
 void destroy_entry(Entry *entry) {
-    free(entry->url);
+    vector_free(*entry->content);
     free(entry->content);
     pthread_mutex_destroy(&entry->mutex);
     pthread_cond_destroy(&entry->cond);
@@ -57,10 +60,10 @@ Pair_t *create_pair(char **key) {
     return pair;
 }
 
-void destroy_pair(Pair_t *pair) {
+void destroy_pair(const Pair_t *pair) {
     destroy_entry(pair->entry);
+    vector_free(*pair->url);
     free(pair->url);
-    free(pair);
 }
 
 Cache *create_cache() {

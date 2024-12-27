@@ -2,6 +2,7 @@
   {
     "arguments": [
       "/usr/bin/gcc",
+      "-O0",
       "-Wall",
       "-Wextra",
       "-Isrc",
@@ -10,11 +11,12 @@
       "-Ihashmap.c",
       "-c",
       "-o",
-      "bin/src/main.o",
-      "src/main.c"
+      "bin/src/garbage_collector.o",
+      "src/garbage_collector.c"
     ],
     "directory": "/home/mike/nsu/osi2/task3",
-    "file": "/home/mike/nsu/osi2/task3/src/main.c",
-    "output": "/home/mike/nsu/osi2/task3/bin/src/main.o"
+    "file": "/home/mike/nsu/osi2/task3/src/garbage_collector.c",
+    "output": "/home/mike/nsu/osi2/task3/bin/src/garbage_collector.o"
   }
 ]
+

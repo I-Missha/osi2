@@ -1,11 +1,14 @@
 #include "main.h"
 #include "cache.h"
+#include "garbage_collector.h"
+#include <pthread.h>
 
 typedef struct ServerArgs {
     int server_fd;
     ParseState *state;
     Pair_t *pair;
     Cache *cache;
+    pthread_cond_t *gar_cond;
 } ServerArgs;
 
 void *server_handler(void *arg) {
@@ -21,8 +24,6 @@ void *server_handler(void *arg) {
     llhttp_t parser;
     Parser_res p_res;
     init_parser(&parser, &p_res, HTTP_RESPONSE, pair->entry->content, NULL);
-    /*printf("%p\n", p_res.full_msg);*/
-    /*printf("%p\n", pair->entry->content);*/
     int server_fd = args->server_fd;
 
     char *buff = (char *)malloc(BUFFER_SIZE);
@@ -32,10 +33,9 @@ void *server_handler(void *arg) {
         int rec_size = read(server_fd, buff, BUFFER_SIZE);
         pthread_mutex_lock(cmutex);
         while (cache->curr_size + rec_size > MAX_CACHE_CAPCITY) {
+            pthread_cond_signal(args->gar_cond);
             pthread_cond_wait(ccond, cmutex);
         }
-
-        // add cond signal for garbage collector
 
         pthread_mutex_lock(emutex);
 
@@ -60,29 +60,40 @@ void *server_handler(void *arg) {
         pthread_mutex_unlock(cmutex);
     }
 
+    pthread_mutex_lock(emutex);
     pair->entry->is_full_content = 1;
+    pthread_mutex_unlock(emutex);
     pthread_cond_signal(econd);
-    // no for ordinary destroy
-    // destroy_parser(&parser, &p_res);
     return NULL;
 }
 
 typedef struct ClientArgs {
     int client_fd;
     Cache *cache;
+    pthread_cond_t *gar_cond;
 } ClientArgs;
 
 int send_cached_content(const Pair_t *pair, int client_fd) {
+
+    if (!pair->entry->is_corresponds_to_cache_size) {
+        return 0;
+    }
 
     pthread_mutex_t *emutex = &pair->entry->mutex;
     pthread_cond_t *econd = &pair->entry->cond;
     char **content = pair->entry->content;
     vec_size_t written_counter = 0;
+
     while (1) {
         pthread_mutex_lock(emutex);
+        pair->entry->time_counter = 0;
         vec_size_t to_write = vector_size(*content);
         while (written_counter == to_write && !pair->entry->is_full_content) {
             pthread_cond_wait(econd, emutex);
+            if (!pair->entry->is_corresponds_to_cache_size) {
+                pthread_mutex_unlock(emutex);
+                return 0;
+            }
             to_write = vector_size(*content);
         }
 
@@ -118,7 +129,6 @@ void *client_handler(void *arg) {
     init_parser(&parser, &p_res, HTTP_REQUEST, NULL, NULL);
 
     if (receive_parsed_request(client_fd, &parser, &p_res)) {
-        /*destroy_parser(&parser, &p_res);*/
         close(client_fd);
         free(client_args);
         return NULL;
@@ -126,11 +136,17 @@ void *client_handler(void *arg) {
 
     const Pair_t *pair_cached =
         hashmap_get(cache->cache, &(Pair_t){.url = p_res.url});
-    if (pair_cached) {
+
+    if (pair_cached && pair_cached->entry->is_full_content) {
         send_cached_content(pair_cached, client_fd);
         close(client_fd);
         free(client_args);
         return NULL;
+    }
+
+    // if it is not full package just update full content
+    if (pair_cached && !pair_cached->entry->is_full_content) {
+        destroy_pair(pair_cached);
     }
 
     char *host_name = vector_create();
@@ -138,12 +154,11 @@ void *client_handler(void *arg) {
 
     int server_fd = connect_via_host_name(host_name);
     if (server_fd < 0) {
-        /*destroy_parser(&parser, &p_res);*/
         close(client_fd);
         free(client_args);
         return NULL;
     }
-    /*printf("%s\n", p_res.full_msg);*/
+
     vec_size_t written_counter = 0;
     vec_size_t to_write = vector_size(*p_res.full_msg);
     while (written_counter != to_write) {
@@ -154,7 +169,6 @@ void *client_handler(void *arg) {
         );
 
         if (written < 0) {
-            /*destroy_parser(&parser, &p_res);*/
             close(client_fd);
             close(server_fd);
             free(client_args);
@@ -168,12 +182,13 @@ void *client_handler(void *arg) {
     ParseState server_parse_state = NotParsed;
     Pair_t *pair = create_pair(p_res.url);
     hashmap_set(cache->cache, pair);
-    ServerArgs args = {server_fd, &server_parse_state, pair, cache};
+    ServerArgs args = {
+        server_fd, &server_parse_state, pair, cache, client_args->gar_cond
+    };
     pthread_create(&thread_id, NULL, server_handler, &args);
     pthread_detach(thread_id);
 
     send_cached_content(pair, client_fd);
-    /*destroy_request_parser(&parser, &p_res);*/
     close(client_fd);
     close(server_fd);
     free(client_args);
@@ -188,6 +203,15 @@ int main() {
     }
 
     Cache *cache = create_cache();
+
+    GarbageCollectorArgs *gar_args = malloc(sizeof(GarbageCollectorArgs));
+    gar_args->cache = cache;
+    pthread_mutex_init(&gar_args->mutex, NULL);
+    pthread_cond_init(&gar_args->cond, NULL);
+    pthread_t gar_id;
+    pthread_create(&gar_id, NULL, garbage_collector, gar_args);
+    pthread_detach(gar_id);
+
     while (1) {
         struct sockaddr_in client_addr;
         socklen_t client_addr_size = sizeof(client_addr);
@@ -202,9 +226,10 @@ int main() {
         }
         pthread_t thread_id;
         ClientArgs *client_args = (ClientArgs *)malloc(sizeof(ClientArgs));
+
         client_args->client_fd = client_fd;
-        // write inition of cache
         client_args->cache = cache;
+        client_args->gar_cond = &gar_args->cond;
         pthread_create(&thread_id, NULL, client_handler, client_args);
         pthread_detach(thread_id);
     }

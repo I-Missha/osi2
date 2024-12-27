@@ -16,6 +16,7 @@ typedef struct CacheEntry {
     int curr_size;
     int is_full_content;
     uint8_t is_corresponds_to_cache_size;
+    uint8_t time_counter;
 
     pthread_rwlock_t lock;
     pthread_cond_t cond;
@@ -34,6 +35,8 @@ typedef struct Cache {
     pthread_cond_t cond;
     pthread_mutex_t mutex;
 } Cache;
+void destroy_entry(Entry *entry);
+void destroy_pair(const Pair_t *pair);
 Pair_t *create_pair(char **key);
 int my_compare(const void *a, const void *b, void *update);
 uint64_t my_hash(const void *item, uint64_t seed0, uint64_t seed1);
