@@ -1,4 +1,5 @@
 #include "main.h"
+#include "cache.h"
 
 typedef struct ServerArgs {
     int server_fd;
@@ -71,7 +72,7 @@ typedef struct ClientArgs {
     Cache *cache;
 } ClientArgs;
 
-int send_cached_content(Pair_t *pair, int client_fd) {
+int send_cached_content(const Pair_t *pair, int client_fd) {
 
     pthread_mutex_t *emutex = &pair->entry->mutex;
     pthread_cond_t *econd = &pair->entry->cond;
@@ -123,6 +124,15 @@ void *client_handler(void *arg) {
         return NULL;
     }
 
+    const Pair_t *pair_cached =
+        hashmap_get(cache->cache, &(Pair_t){.url = p_res.url});
+    if (pair_cached) {
+        send_cached_content(pair_cached, client_fd);
+        close(client_fd);
+        free(client_args);
+        return NULL;
+    }
+
     char *host_name = vector_create();
     http_parse_host_name(*p_res.url, &host_name);
 
@@ -164,8 +174,8 @@ void *client_handler(void *arg) {
 
     send_cached_content(pair, client_fd);
     /*destroy_request_parser(&parser, &p_res);*/
-    /*close(client_fd);*/
-    /*close(host_fd);*/
+    close(client_fd);
+    close(server_fd);
     free(client_args);
     return NULL;
 }
