@@ -28,16 +28,16 @@ typedef struct ParserResults_t {
     llhttp_method_t method;
     uint8_t minor_version;
     uint8_t major_version;
-    char *full_msg;
-    char *url;
+    char **full_msg;
+    char **url;
 } Parser_res;
 
 int init_parser(
     llhttp_t *parser,
     Parser_res *p_res,
     llhttp_type_t http_type,
-    char *full_msg,
-    char *url
+    char **full_msg,
+    char **url
 );
 
 int is_method_acceptable(Parser_res *p_res);

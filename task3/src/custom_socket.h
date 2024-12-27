@@ -1,8 +1,10 @@
 #ifndef __SOCKET__LIB__
 #define __SOCKET__LIB__
+#include <errno.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <stdio.h>
+#include <string.h>
 #include <sys/socket.h>
 
 #define ERROR -1

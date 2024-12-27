@@ -1,7 +1,4 @@
 #include "custom_socket.h"
-#include <errno.h>
-#include <error.h>
-#include <string.h>
 
 int create_server_fd(const int PORT) {
     int server_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -57,7 +54,7 @@ int connect_via_host_name(const char *host_name) {
     }
 
     struct addrinfo *iter = addr_arr;
-    int host_fd;
+    int host_fd = -1;
     while (iter != NULL) {
         host_fd = socket(iter->ai_family, iter->ai_socktype, iter->ai_protocol);
 

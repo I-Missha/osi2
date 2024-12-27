@@ -17,7 +17,7 @@ int on_message_complete(llhttp_t *parser) {
 int on_method_complete(llhttp_t *parser) {
     Parser_res *parser_res = parser->data;
     const ParseState state = MethodParsed;
-    parser_res->parseStateMsg = state;
+    parser_res->parseStateMethod = state;
     parser_res->method = llhttp_get_method(parser);
     return 0;
 }
@@ -25,7 +25,7 @@ int on_method_complete(llhttp_t *parser) {
 int on_version_complete(llhttp_t *parser) {
     Parser_res *parser_res = parser->data;
     const ParseState state = VersionParsed;
-    parser_res->parseStateMsg = state;
+    parser_res->parseStateVersion = state;
     parser_res->major_version = llhttp_get_http_major(parser);
     parser_res->minor_version = llhttp_get_http_minor(parser);
     return 0;
@@ -34,34 +34,43 @@ int on_version_complete(llhttp_t *parser) {
 int on_url(llhttp_t *parser, const char *url_part, uint64_t addition_size) {
     Parser_res *parser_res = parser->data;
     for (uint64_t i = 0; i < addition_size; i++) {
-        vector_add(&parser_res->url, url_part[i]);
+        vector_add(parser_res->url, url_part[i]);
     }
     return 0;
+}
+
+static char **create_vector_handler() {
+    char **vec_ptr = (char **)malloc(sizeof(char *));
+    char *new_vec = vector_create();
+    *vec_ptr = new_vec;
+    return vec_ptr;
 }
 
 int init_parser(
     llhttp_t *parser,
     Parser_res *p_res,
     llhttp_type_t http_type,
-    char *full_msg,
-    char *url
+    char **full_msg,
+    char **url
 ) {
     static llhttp_settings_t settings;
 
     llhttp_settings_init(&settings);
     settings.on_url = on_url;
-    settings.on_url_complete = on_message_complete;
+    settings.on_url_complete = on_url_complete;
+    settings.on_message_complete = on_message_complete;
     settings.on_method_complete = on_method_complete;
     settings.on_version_complete = on_version_complete;
 
     if (!full_msg) {
-        p_res->full_msg = vector_create();
+        p_res->full_msg = create_vector_handler();
     } else {
+
         p_res->full_msg = full_msg;
     }
 
     if (!url) {
-        p_res->url = vector_create();
+        p_res->url = create_vector_handler();
     } else {
         p_res->url = url;
     }
@@ -133,20 +142,25 @@ int receive_parsed_request(int client_fd, llhttp_t *parser, Parser_res *p_res) {
     char *buff = malloc(BUFFER_SIZE);
     while (p_res->parseStateMsg != MsgParsed) {
         int rec_size = read(client_fd, buff, BUFFER_SIZE);
-        vector_push_str(&p_res->full_msg, buff, rec_size);
+        vector_push_str(p_res->full_msg, buff, rec_size);
+
+        if (parse_http(parser, buff, rec_size)) {
+            free(buff);
+            return PARSE_ERROR;
+        }
+
         if (p_res->parseStateVersion == VersionParsed &&
             !is_version_acceptable(p_res)) {
+            free(buff);
             return PARSE_ERROR;
         }
 
         if (p_res->parseStateMethod == MethodParsed &&
             !is_method_acceptable(p_res)) {
-            return PARSE_ERROR;
-        }
-
-        if (parse_http(parser, buff, rec_size)) {
+            free(buff);
             return PARSE_ERROR;
         }
     }
+    free(buff);
     return SUCCESS_PARSE;
 }

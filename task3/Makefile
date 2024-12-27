@@ -2,7 +2,7 @@
 CC = gcc
 
 # Флаги компиляции
-CFLAGS = -Wall -Wextra -I$(SRC_DIR) -I$(LLHTTP_DIR) -I$(VECTOR_DIR) -I$(HASHMAP_DIR)
+CFLAGS = -O0 -Wall -Wextra -I$(SRC_DIR) -I$(LLHTTP_DIR) -I$(VECTOR_DIR) -I$(HASHMAP_DIR)
 LDFLAGS = $(LLHTTP_DIR)/libllhttp.a
 
 # Директории

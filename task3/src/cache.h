@@ -10,9 +10,9 @@
 #define MAX_CAPACITY 4096 * 100
 
 typedef struct CacheEntry {
-    // url and content is vector
-    char *url;
-    char *content;
+    // url and content is a pointer to the vector var
+    char **url;
+    char **content;
     int curr_size;
     int is_full_content;
     uint8_t is_corresponds_to_cache_size;
@@ -23,7 +23,7 @@ typedef struct CacheEntry {
 } Entry;
 
 typedef struct KeyValuePair {
-    char *url;
+    char **url;
     Entry *entry;
 } Pair_t;
 
@@ -34,7 +34,7 @@ typedef struct Cache {
     pthread_cond_t cond;
     pthread_mutex_t mutex;
 } Cache;
-Pair_t *create_pair(char *key);
+Pair_t *create_pair(char **key);
 int my_compare(const void *a, const void *b, void *update);
 uint64_t my_hash(const void *item, uint64_t seed0, uint64_t seed1);
 Cache *create_cache();
