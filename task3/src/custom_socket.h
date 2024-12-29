@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <unistd.h>
 
 #define ERROR -1
 #define PENDING_NUMB 20

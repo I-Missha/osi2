@@ -2,6 +2,7 @@
 #define __CACHE__LIB__
 #include <hashmap.h>
 #include <pthread.h>
+#include <stdio.h>
 #include <string.h>
 #include <vec.h>
 
@@ -15,11 +16,10 @@ typedef struct CacheEntry {
     char **content;
     int curr_size;
     int is_full_content;
+    int is_realeased_by_gb;
     uint8_t is_corresponds_to_cache_size;
-    uint8_t time_counter;
+    uint64_t ref_counter;
 
-    pthread_rwlock_t lock;
-    pthread_cond_t cond;
     pthread_mutex_t mutex;
 } Entry;
 
@@ -34,7 +34,9 @@ typedef struct Cache {
 
     pthread_cond_t cond;
     pthread_mutex_t mutex;
+    pthread_rwlock_t lock;
 } Cache;
+
 void destroy_entry(Entry *entry);
 void destroy_pair(const Pair_t *pair);
 Pair_t *create_pair(char **key);

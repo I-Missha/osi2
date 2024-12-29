@@ -17,6 +17,7 @@ typedef struct GarbageCollectorArgs {
     Cache *cache;
     pthread_cond_t cond;
     pthread_mutex_t mutex;
+    pthread_cond_t *cache_cond;
 } GarbageCollectorArgs;
 
 #endif

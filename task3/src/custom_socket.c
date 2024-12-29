@@ -47,8 +47,6 @@ int connect_via_host_name(const char *host_name) {
 
     int err = getaddrinfo(host_name, "http", &hints, &addr_arr);
     if (err != 0) {
-        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(err));
-        perror("can not resolve host name");
         freeaddrinfo(addr_arr);
         return -1;
     }
@@ -67,7 +65,9 @@ int connect_via_host_name(const char *host_name) {
             break;
         }
 
+        close(host_fd);
         iter = iter->ai_next;
     }
+    freeaddrinfo(addr_arr);
     return host_fd;
 }

@@ -17,7 +17,6 @@ void *server_handler(void *arg) {
     Cache *cache = args->cache;
 
     pthread_mutex_t *emutex = &pair->entry->mutex;
-    pthread_cond_t *econd = &pair->entry->cond;
     pthread_mutex_t *cmutex = &cache->mutex;
     pthread_cond_t *ccond = &cache->cond;
 
@@ -28,6 +27,10 @@ void *server_handler(void *arg) {
 
     char *buff = (char *)malloc(BUFFER_SIZE);
 
+    pthread_mutex_lock(emutex);
+    pair->entry->ref_counter++;
+    pthread_mutex_unlock(emutex);
+
     int rec_counter = 0;
     while (p_res.parseStateMsg != MsgParsed) {
         int rec_size = read(server_fd, buff, BUFFER_SIZE);
@@ -37,11 +40,10 @@ void *server_handler(void *arg) {
             pthread_cond_wait(ccond, cmutex);
         }
 
-        pthread_mutex_lock(emutex);
+        pthread_mutex_unlock(cmutex);
 
         if (rec_counter + rec_size >= MAX_CACHE_ENTRY_CAPCITY) {
             pair->entry->is_corresponds_to_cache_size = 0;
-            pthread_mutex_unlock(emutex);
             break;
         }
 
@@ -51,19 +53,19 @@ void *server_handler(void *arg) {
         }
 
         if (parse_http(&parser, buff, rec_size)) {
-            pthread_mutex_unlock(emutex);
             return NULL;
         }
+
+        pthread_mutex_lock(&cache->mutex);
         cache->curr_size += rec_size;
-        pthread_cond_signal(econd);
-        pthread_mutex_unlock(emutex);
-        pthread_mutex_unlock(cmutex);
+        pthread_mutex_unlock(&cache->mutex);
     }
 
     pthread_mutex_lock(emutex);
     pair->entry->is_full_content = 1;
+    pair->entry->ref_counter--;
     pthread_mutex_unlock(emutex);
-    pthread_cond_signal(econd);
+
     return NULL;
 }
 
@@ -73,32 +75,30 @@ typedef struct ClientArgs {
     pthread_cond_t *gar_cond;
 } ClientArgs;
 
-int send_cached_content(const Pair_t *pair, int client_fd) {
+int send_cached_content(Cache *cache, const Pair_t *pair, int client_fd) {
 
     if (!pair->entry->is_corresponds_to_cache_size) {
         return 0;
     }
 
     pthread_mutex_t *emutex = &pair->entry->mutex;
-    pthread_cond_t *econd = &pair->entry->cond;
     char **content = pair->entry->content;
     vec_size_t written_counter = 0;
 
+    pthread_mutex_lock(emutex);
+    pair->entry->ref_counter++;
+    pthread_mutex_unlock(emutex);
+
     while (1) {
-        pthread_mutex_lock(emutex);
-        pair->entry->time_counter = 0;
         vec_size_t to_write = vector_size(*content);
         while (written_counter == to_write && !pair->entry->is_full_content) {
-            pthread_cond_wait(econd, emutex);
             if (!pair->entry->is_corresponds_to_cache_size) {
-                pthread_mutex_unlock(emutex);
                 return 0;
             }
             to_write = vector_size(*content);
         }
 
         if (written_counter == to_write && pair->entry->is_full_content) {
-            pthread_mutex_unlock(emutex);
             break;
         }
 
@@ -108,13 +108,28 @@ int send_cached_content(const Pair_t *pair, int client_fd) {
 
         if (written < 0) {
             printf("%s\n", strerror(errno));
-            pthread_mutex_unlock(emutex);
             return -1;
         }
 
         written_counter += written;
-        pthread_mutex_unlock(emutex);
     }
+
+    pthread_mutex_lock(emutex);
+    pair->entry->ref_counter--;
+
+    if (pair->entry->ref_counter == 0) {
+        hashmap_delete(cache->cache, pair);
+        pthread_mutex_unlock(emutex);
+        vec_size_t size = vector_size(pair->entry->content);
+        destroy_pair(pair);
+
+        pthread_mutex_lock(&cache->mutex);
+        cache->curr_size -= size;
+        pthread_cond_signal(&cache->cond);
+        pthread_mutex_unlock(&cache->mutex);
+        return 0;
+    }
+    pthread_mutex_unlock(emutex);
     return 0;
 }
 
@@ -134,11 +149,13 @@ void *client_handler(void *arg) {
         return NULL;
     }
 
+    pthread_rwlock_rdlock(&cache->lock);
     const Pair_t *pair_cached =
         hashmap_get(cache->cache, &(Pair_t){.url = p_res.url});
+    pthread_rwlock_unlock(&cache->lock);
 
     if (pair_cached) {
-        send_cached_content(pair_cached, client_fd);
+        send_cached_content(cache, pair_cached, client_fd);
         close(client_fd);
         free(client_args);
         return NULL;
@@ -175,15 +192,21 @@ void *client_handler(void *arg) {
 
     pthread_t thread_id;
     ParseState server_parse_state = NotParsed;
+
     Pair_t *pair = create_pair(p_res.url);
+
+    pthread_rwlock_wrlock(&cache->lock);
     hashmap_set(cache->cache, pair);
+    pthread_rwlock_unlock(&cache->lock);
+
     ServerArgs args = {
         server_fd, &server_parse_state, pair, cache, client_args->gar_cond
     };
+
     pthread_create(&thread_id, NULL, server_handler, &args);
     pthread_detach(thread_id);
 
-    send_cached_content(pair, client_fd);
+    send_cached_content(cache, pair, client_fd);
     close(client_fd);
     close(server_fd);
     free(client_args);
@@ -201,6 +224,7 @@ int main() {
 
     GarbageCollectorArgs *gar_args = malloc(sizeof(GarbageCollectorArgs));
     gar_args->cache = cache;
+    gar_args->cache_cond = &cache->cond;
     pthread_mutex_init(&gar_args->mutex, NULL);
     pthread_cond_init(&gar_args->cond, NULL);
     pthread_t gar_id;
@@ -215,10 +239,10 @@ int main() {
         );
 
         if (client_fd == -1) {
-            perror("accept failed\n");
             perror(strerror(errno));
             continue;
         }
+
         pthread_t thread_id;
         ClientArgs *client_args = (ClientArgs *)malloc(sizeof(ClientArgs));
 
