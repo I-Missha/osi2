@@ -41,9 +41,7 @@ void *reader(void *arg) {
 
     while (1) {
         int val = -1;
-        pthread_spin_lock(&q->spinlock);
         int ok = queue_get(q, &val);
-        pthread_spin_unlock(&q->spinlock);
         if (!ok)
             continue;
 
@@ -68,9 +66,7 @@ void *writer(void *arg) {
     set_cpu(1);
 
     while (1) {
-        pthread_spin_lock(&q->spinlock);
         int ok = queue_add(q, i);
-        pthread_spin_unlock(&q->spinlock);
         if (!ok)
             continue;
         i++;

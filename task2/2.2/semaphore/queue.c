@@ -56,12 +56,16 @@ int queue_add(queue_t *q, int val) {
 
     assert(q->count <= q->max_count);
 
-    if (q->count == q->max_count)
+    sem_wait(&q->sem);
+    if (q->count == q->max_count) {
+        sem_post(&q->sem);
         return 0;
+    }
 
     qnode_t *new = malloc(sizeof(qnode_t));
     if (!new) {
         printf("Cannot allocate memory for new node\n");
+        sem_post(&q->sem);
         abort();
     }
 
@@ -78,6 +82,7 @@ int queue_add(queue_t *q, int val) {
     q->count++;
     q->add_count++;
 
+    sem_post(&q->sem);
     return 1;
 }
 
@@ -86,8 +91,11 @@ int queue_get(queue_t *q, int *val) {
 
     assert(q->count >= 0);
 
-    if (q->count == 0)
+    sem_wait(&q->sem);
+    if (q->count == 0) {
+        sem_post(&q->sem);
         return 0;
+    }
 
     qnode_t *tmp = q->first;
 
@@ -98,6 +106,7 @@ int queue_get(queue_t *q, int *val) {
     q->count--;
     q->get_count++;
 
+    sem_post(&q->sem);
     return 1;
 }
 

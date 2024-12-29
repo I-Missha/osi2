@@ -57,8 +57,11 @@ int queue_add(queue_t *q, int val) {
 
     assert(q->count <= q->max_count);
 
-    if (q->count == q->max_count)
+    pthread_spin_lock(&q->spinlock);
+    if (q->count == q->max_count) {
+        pthread_spin_unlock(&q->spinlock);
         return 0;
+    }
 
     qnode_t *new = malloc(sizeof(qnode_t));
     if (!new) {
@@ -79,6 +82,7 @@ int queue_add(queue_t *q, int val) {
     q->count++;
     q->add_count++;
 
+    pthread_spin_unlock(&q->spinlock);
     return 1;
 }
 
@@ -87,9 +91,11 @@ int queue_get(queue_t *q, int *val) {
 
     assert(q->count >= 0);
 
-    if (q->count == 0)
+    pthread_spin_lock(&q->spinlock);
+    if (q->count == 0) {
+        pthread_spin_unlock(&q->spinlock);
         return 0;
-
+    }
     qnode_t *tmp = q->first;
 
     *val = tmp->val;
@@ -99,6 +105,7 @@ int queue_get(queue_t *q, int *val) {
     q->count--;
     q->get_count++;
 
+    pthread_spin_unlock(&q->spinlock);
     return 1;
 }
 

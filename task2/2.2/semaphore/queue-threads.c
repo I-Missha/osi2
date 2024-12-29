@@ -41,9 +41,7 @@ void *reader(void *arg) {
     while (1) {
         int val = -1;
 
-        sem_wait(&q->sem);
         int ok = queue_get(q, &val);
-        sem_post(&q->sem);
         if (!ok)
             continue;
 
@@ -68,9 +66,7 @@ void *writer(void *arg) {
     set_cpu(2);
 
     while (1) {
-        sem_wait(&q->sem);
         int ok = queue_add(q, i);
-        sem_post(&q->sem);
         if (!ok)
             continue;
         i++;
