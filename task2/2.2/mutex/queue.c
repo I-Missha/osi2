@@ -58,12 +58,16 @@ int queue_add(queue_t *q, int val) {
 
     assert(q->count <= q->max_count);
 
-    if (q->count == q->max_count)
+    pthread_mutex_lock(&q->mutex);
+    if (q->count == q->max_count) {
+        pthread_mutex_unlock(&q->mutex);
         return 0;
+    }
 
     qnode_t *new = malloc(sizeof(qnode_t));
     if (!new) {
         printf("Cannot allocate memory for new node\n");
+        pthread_mutex_unlock(&q->mutex);
         abort();
     }
 
@@ -80,16 +84,20 @@ int queue_add(queue_t *q, int val) {
     q->count++;
     q->add_count++;
 
+    pthread_mutex_unlock(&q->mutex);
     return 1;
 }
 
 int queue_get(queue_t *q, int *val) {
     q->get_attempts++;
 
+    pthread_mutex_lock(&q->mutex);
     assert(q->count >= 0);
 
-    if (q->count == 0)
+    if (q->count == 0) {
+        pthread_mutex_unlock(&q->mutex);
         return 0;
+    }
 
     qnode_t *tmp = q->first;
 
@@ -100,6 +108,7 @@ int queue_get(queue_t *q, int *val) {
     q->count--;
     q->get_count++;
 
+    pthread_mutex_unlock(&q->mutex);
     return 1;
 }
 

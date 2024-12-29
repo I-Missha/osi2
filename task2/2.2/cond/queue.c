@@ -57,9 +57,10 @@ int queue_add(queue_t *q, int val) {
     q->add_attempts++;
 
     assert(q->count <= q->max_count);
-
-    if (q->count == q->max_count)
-        return 0;
+    pthread_mutex_lock(&q->mutex);
+    while (q->count == q->max_count) {
+        pthread_cond_wait(&q->add_cond, &q->mutex);
+    }
 
     qnode_t *new = malloc(sizeof(qnode_t));
     if (!new) {
@@ -79,6 +80,8 @@ int queue_add(queue_t *q, int val) {
 
     q->count++;
     q->add_count++;
+    pthread_cond_signal(&q->get_cond);
+    pthread_mutex_unlock(&q->mutex);
 
     return 1;
 }
@@ -86,10 +89,11 @@ int queue_add(queue_t *q, int val) {
 int queue_get(queue_t *q, int *val) {
     q->get_attempts++;
 
+    pthread_mutex_lock(&q->mutex);
     assert(q->count >= 0);
-
-    if (q->count == 0)
-        return 0;
+    while (q->count == 0) {
+        pthread_cond_wait(&q->get_cond, &q->mutex);
+    }
 
     qnode_t *tmp = q->first;
 
@@ -100,6 +104,8 @@ int queue_get(queue_t *q, int *val) {
     q->count--;
     q->get_count++;
 
+    pthread_cond_signal(&q->add_cond);
+    pthread_mutex_unlock(&q->mutex);
     return 1;
 }
 

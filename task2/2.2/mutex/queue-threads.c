@@ -40,9 +40,7 @@ void *reader(void *arg) {
 
     while (1) {
         int val = -1;
-        pthread_mutex_lock(&q->mutex);
         int ok = queue_get(q, &val);
-        pthread_mutex_unlock(&q->mutex);
         if (!ok)
             continue;
 
@@ -67,9 +65,7 @@ void *writer(void *arg) {
     set_cpu(2);
 
     while (1) {
-        pthread_mutex_lock(&q->mutex);
         int ok = queue_add(q, i);
-        pthread_mutex_unlock(&q->mutex);
         if (!ok)
             continue;
         i++;
