@@ -136,8 +136,8 @@ int main() {
 
     printf("main [%d %d %d]\n", getpid(), getppid(), gettid());
 
-    l = list_init(10000);
-    fill_list(l, 10000);
+    l = list_init(100000);
+    fill_list(l, 100000);
     thread_comparision_args args_more = {l, isMore};
     err = pthread_create(&tid, NULL, thread_comparision, &args_more);
     thread_comparision_args args_less = {l, isLess};
