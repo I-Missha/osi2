@@ -1,6 +1,5 @@
 #include "main.h"
 #include "cache.h"
-#include "http_parser.h"
 #include "vec.h"
 #include <pthread.h>
 
@@ -126,7 +125,6 @@ int send_cached_content(Cache *cache, const Pair_t *pair, int client_fd) {
         hashmap_delete(cache->cache, pair);
         pthread_mutex_unlock(emutex);
         destroy_pair(pair);
-
         return 0;
     }
     pthread_mutex_unlock(emutex);
@@ -134,23 +132,19 @@ int send_cached_content(Cache *cache, const Pair_t *pair, int client_fd) {
 }
 
 Pair_t *hashmap_get_or_set(Cache *cache, char **url) {
-    char *vec_copy = vector_create();
-    for (vec_size_t i = 0; i < vector_size(*url); i++) {
-        vector_add(&vec_copy, (*url)[i]);
-    }
-
+    Pair_t *temp = create_pair_url_only(url);
     pthread_rwlock_wrlock(&cache->lock);
-    Pair_t *pair_cached =
-        hashmap_get(cache->cache, &(Pair_t){.url = &vec_copy});
+    Pair_t *pair_cached = hashmap_get(cache->cache, temp);
+    vector_free(*temp->url);
+    free(temp->url);
+    free(temp);
     if (!pair_cached) {
         Pair_t *pair = create_pair(url);
         hashmap_set(cache->cache, pair);
         pthread_rwlock_unlock(&cache->lock);
-        vector_free(vec_copy);
         return NULL;
     }
     pthread_rwlock_unlock(&cache->lock);
-    vector_free(vec_copy);
     return pair_cached;
 }
 
@@ -211,14 +205,13 @@ void *client_handler(void *arg) {
     pthread_t thread_id;
     ParseState server_parse_state = NotParsed;
 
+    Pair_t *temp = create_pair_url_only(p_res.url);
     pthread_rwlock_rdlock(&cache->lock);
-    char *vec_copy = vector_create();
-    for (vec_size_t i = 0; i < vector_size(*p_res.url); i++) {
-        vector_add(&vec_copy, (*p_res.url)[i]);
-    }
-    Pair_t *pair = hashmap_get(cache->cache, &(Pair_t){.url = &vec_copy});
-    vector_free(vec_copy);
+    Pair_t *pair = hashmap_get(cache->cache, temp);
     pthread_rwlock_unlock(&cache->lock);
+    vector_free(*temp->url);
+    free(temp->url);
+    free(temp);
 
     ServerArgs args = {
         server_fd, &server_parse_state, pair, cache, client_args->gar_cond
@@ -229,7 +222,6 @@ void *client_handler(void *arg) {
 
     send_cached_content(cache, pair, client_fd);
     close(client_fd);
-    /*close(server_fd);*/
     free(client_args);
     return NULL;
 }

@@ -1,6 +1,6 @@
 #include "garbage_collector.h"
 
-#define TIME_TO_CLEAR 60 * 10
+#define TIME_TO_CLEAR 30
 
 void iterate_over_map(Cache *cache) {
     size_t iter = 0;
