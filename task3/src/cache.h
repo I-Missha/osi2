@@ -38,6 +38,7 @@ typedef struct Cache {
     pthread_rwlock_t lock;
 } Cache;
 
+Pair_t *create_pair_url_only(char **key);
 void destroy_entry(Entry *entry);
 void destroy_pair(const Pair_t *pair);
 Pair_t *create_pair(char **key);

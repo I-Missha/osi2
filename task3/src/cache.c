@@ -22,7 +22,7 @@ static char **create_vector_handler_from_str(char *str) {
     char **vec_ptr = (char **)malloc(sizeof(char *));
     char *just = vector_create();
     *vec_ptr = just;
-    for (int i = 0; i < vector_size(str); i++) {
+    for (vec_size_t i = 0; i < vector_size(str); i++) {
         vector_add(vec_ptr, str[i]);
     }
 
@@ -60,6 +60,13 @@ Pair_t *create_pair(char **key) {
 
     pair->url = create_vector_handler_from_str(*key);
     pair->entry = create_entry(*key);
+    return pair;
+}
+
+Pair_t *create_pair_url_only(char **key) {
+    Pair_t *pair = (Pair_t *)malloc(sizeof(Pair_t));
+
+    pair->url = create_vector_handler_from_str(*key);
     return pair;
 }
 

@@ -1,4 +1,6 @@
 #include "main.h"
+#include "cache.h"
+#include "vec.h"
 
 typedef struct ServerArgs {
     int server_fd;
@@ -11,7 +13,6 @@ typedef struct ServerArgs {
 void *server_handler(void *arg) {
     ServerArgs *args = (ServerArgs *)arg;
     Pair_t *pair = args->pair;
-    Cache *cache = args->cache;
 
     pthread_mutex_t *emutex = &pair->entry->mutex;
 
@@ -109,7 +110,8 @@ int send_cached_content(Cache *cache, const Pair_t *pair, int client_fd) {
 
         if (written < 0) {
             printf("%s\n", strerror(errno));
-            return -1;
+            break;
+            /*return -1;*/
         }
 
         written_counter += written;
@@ -129,6 +131,17 @@ int send_cached_content(Cache *cache, const Pair_t *pair, int client_fd) {
     return 0;
 }
 
+static char **create_vector_handler_from_str(char *str) {
+    char **vec_ptr = (char **)malloc(sizeof(char *));
+    char *just = vector_create();
+    *vec_ptr = just;
+    for (vec_size_t i = 0; i < vector_size(str); i++) {
+        vector_add(vec_ptr, str[i]);
+    }
+
+    return vec_ptr;
+}
+
 void *client_handler(void *arg) {
     ClientArgs *client_args = (ClientArgs *)arg;
     int client_fd = client_args->client_fd;
@@ -145,11 +158,13 @@ void *client_handler(void *arg) {
         return NULL;
     }
 
-    /*printf("%s\n", *p_res.url);*/
+    Pair_t *temp = create_pair_url_only(p_res.url);
     pthread_rwlock_rdlock(&cache->lock);
-    const Pair_t *pair_cached =
-        hashmap_get(cache->cache, &(Pair_t){.url = p_res.url});
+    const Pair_t *pair_cached = hashmap_get(cache->cache, temp);
     pthread_rwlock_unlock(&cache->lock);
+    vector_free(*temp->url);
+    free(temp->url);
+    free(temp);
 
     if (pair_cached) {
         send_cached_content(cache, pair_cached, client_fd);
@@ -191,7 +206,7 @@ void *client_handler(void *arg) {
     ParseState server_parse_state = NotParsed;
 
     Pair_t *pair = create_pair(p_res.url);
-
+    // i have a cuple questions...
     pthread_rwlock_wrlock(&cache->lock);
     hashmap_set(cache->cache, pair);
     pthread_rwlock_unlock(&cache->lock);
