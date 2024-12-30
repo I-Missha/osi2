@@ -1,6 +1,7 @@
 #include "main.h"
 #include "cache.h"
 #include "vec.h"
+#include <pthread.h>
 
 typedef struct ServerArgs {
     int server_fd;
@@ -33,7 +34,7 @@ void *server_handler(void *arg) {
         if (rec_size <= 0) {
             pthread_mutex_lock(emutex);
             pair->entry->ref_counter--;
-            pthread_cond_signal(&pair->entry->cond);
+            pthread_cond_broadcast(&pair->entry->cond);
             pthread_mutex_unlock(emutex);
 
             close(server_fd);
@@ -57,7 +58,7 @@ void *server_handler(void *arg) {
             return NULL;
         }
 
-        pthread_cond_signal(&pair->entry->cond);
+        pthread_cond_broadcast(&pair->entry->cond);
     }
 
     pthread_mutex_lock(emutex);
@@ -131,15 +132,21 @@ int send_cached_content(Cache *cache, const Pair_t *pair, int client_fd) {
     return 0;
 }
 
-static char **create_vector_handler_from_str(char *str) {
-    char **vec_ptr = (char **)malloc(sizeof(char *));
-    char *just = vector_create();
-    *vec_ptr = just;
-    for (vec_size_t i = 0; i < vector_size(str); i++) {
-        vector_add(vec_ptr, str[i]);
+Pair_t *hashmap_get_or_set(Cache *cache, char **url) {
+    Pair_t *temp = create_pair_url_only(url);
+    pthread_rwlock_wrlock(&cache->lock);
+    Pair_t *pair_cached = hashmap_get(cache->cache, temp);
+    vector_free(*temp->url);
+    free(temp->url);
+    free(temp);
+    if (!pair_cached) {
+        Pair_t *pair = create_pair(url);
+        hashmap_set(cache->cache, pair);
+        pthread_rwlock_unlock(&cache->lock);
+        return NULL;
     }
-
-    return vec_ptr;
+    pthread_rwlock_unlock(&cache->lock);
+    return pair_cached;
 }
 
 void *client_handler(void *arg) {
@@ -158,13 +165,7 @@ void *client_handler(void *arg) {
         return NULL;
     }
 
-    Pair_t *temp = create_pair_url_only(p_res.url);
-    pthread_rwlock_rdlock(&cache->lock);
-    const Pair_t *pair_cached = hashmap_get(cache->cache, temp);
-    pthread_rwlock_unlock(&cache->lock);
-    vector_free(*temp->url);
-    free(temp->url);
-    free(temp);
+    Pair_t *pair_cached = hashmap_get_or_set(cache, p_res.url);
 
     if (pair_cached) {
         send_cached_content(cache, pair_cached, client_fd);
@@ -205,11 +206,13 @@ void *client_handler(void *arg) {
     pthread_t thread_id;
     ParseState server_parse_state = NotParsed;
 
-    Pair_t *pair = create_pair(p_res.url);
-    // i have a cuple questions...
-    pthread_rwlock_wrlock(&cache->lock);
-    hashmap_set(cache->cache, pair);
+    Pair_t *temp = create_pair_url_only(p_res.url);
+    pthread_rwlock_rdlock(&cache->lock);
+    Pair_t *pair = hashmap_get(cache->cache, temp);
     pthread_rwlock_unlock(&cache->lock);
+    vector_free(*temp->url);
+    free(temp->url);
+    free(temp);
 
     ServerArgs args = {
         server_fd, &server_parse_state, pair, cache, client_args->gar_cond
