@@ -41,6 +41,7 @@ Entry *create_entry(char *url) {
     entry->ref_counter = 1;
     entry->is_realeased_by_gb = 0;
     pthread_mutex_init(&entry->mutex, NULL);
+    pthread_cond_init(&entry->cond, NULL);
     return entry;
 }
 
@@ -48,6 +49,7 @@ void destroy_entry(Entry *entry) {
     vector_free(*entry->content);
     free(entry->content);
     pthread_mutex_destroy(&entry->mutex);
+    pthread_cond_destroy(&entry->cond);
     vector_free(*entry->url);
     free(entry->url);
     free(entry);

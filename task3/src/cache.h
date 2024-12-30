@@ -21,6 +21,7 @@ typedef struct CacheEntry {
     uint64_t ref_counter;
 
     pthread_mutex_t mutex;
+    pthread_cond_t cond;
 } Entry;
 
 typedef struct KeyValuePair {

@@ -1,7 +1,6 @@
 #include "garbage_collector.h"
-#include "cache.h"
 
-#define TIME_TO_CLEAR 10
+#define TIME_TO_CLEAR 60 * 10
 
 void iterate_over_map(Cache *cache) {
     size_t iter = 0;
@@ -22,13 +21,8 @@ void iterate_over_map(Cache *cache) {
             hashmap_delete(cache->cache, pair);
             pthread_mutex_unlock(&pair->entry->mutex);
 
-            vec_size_t size = vector_size(pair->entry->content);
             destroy_pair(pair);
 
-            pthread_mutex_lock(&cache->mutex);
-            cache->curr_size -= size;
-            pthread_mutex_unlock(&cache->mutex);
-            /*pthread_cond_signal(&cache->cond);*/
             continue;
         }
         pthread_mutex_unlock(&pair->entry->mutex);
@@ -43,7 +37,7 @@ void *garbage_collector(void *arg) {
         struct timespec timeout;
         // pizdec, mutex == wait
         gettimeofday(&now, NULL);
-        timeout.tv_sec = now.tv_sec + 10;
+        timeout.tv_sec = now.tv_sec + TIME_TO_CLEAR;
         timeout.tv_nsec = now.tv_usec * 1000;
 
         pthread_mutex_lock(&args->mutex);
