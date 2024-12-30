@@ -1,7 +1,4 @@
 #include "main.h"
-#include "cache.h"
-#include "vec.h"
-#include <pthread.h>
 
 typedef struct ServerArgs {
     int server_fd;
@@ -34,7 +31,6 @@ void *server_handler(void *arg) {
         if (rec_size <= 0) {
             pthread_mutex_lock(emutex);
             pair->entry->ref_counter--;
-            pthread_cond_broadcast(&pair->entry->cond);
             pthread_mutex_unlock(emutex);
 
             close(server_fd);
@@ -49,10 +45,12 @@ void *server_handler(void *arg) {
             break;
         }
 
+        pthread_rwlock_wrlock(&pair->entry->lock);
         char **copy = pair->entry->content;
         for (int i = 0; i < rec_size; i++) {
             vector_add(copy, buff[i]);
         }
+        pthread_rwlock_unlock(&pair->entry->lock);
 
         if (parse_http(&parser, buff, rec_size)) {
             return NULL;
@@ -78,6 +76,7 @@ typedef struct ClientArgs {
 int send_cached_content(Cache *cache, const Pair_t *pair, int client_fd) {
 
     if (!pair->entry->is_corresponds_to_cache_size) {
+        printf("cache size\n");
         return 0;
     }
 
@@ -89,15 +88,20 @@ int send_cached_content(Cache *cache, const Pair_t *pair, int client_fd) {
     pair->entry->ref_counter++;
     pthread_mutex_unlock(emutex);
 
+    printf("cache before to write\n");
     while (1) {
+        pthread_rwlock_rdlock(&pair->entry->lock);
         vec_size_t to_write = vector_size(*content);
+        pthread_rwlock_unlock(&pair->entry->lock);
         pthread_mutex_lock(emutex);
         while (written_counter == to_write && !pair->entry->is_full_content) {
             pthread_cond_wait(&pair->entry->cond, emutex);
             if (!pair->entry->is_corresponds_to_cache_size) {
                 return 0;
             }
+            pthread_rwlock_rdlock(&pair->entry->lock);
             to_write = vector_size(*content);
+            pthread_rwlock_unlock(&pair->entry->lock);
         }
         pthread_mutex_unlock(emutex);
 
@@ -105,11 +109,13 @@ int send_cached_content(Cache *cache, const Pair_t *pair, int client_fd) {
             break;
         }
 
+        pthread_rwlock_rdlock(&pair->entry->lock);
         int written = write(
             client_fd, *content + written_counter, to_write - written_counter
         );
+        pthread_rwlock_unlock(&pair->entry->lock);
 
-        if (written < 0) {
+        if (written <= 0) {
             printf("%s\n", strerror(errno));
             break;
             /*return -1;*/
@@ -125,6 +131,7 @@ int send_cached_content(Cache *cache, const Pair_t *pair, int client_fd) {
         hashmap_delete(cache->cache, pair);
         pthread_mutex_unlock(emutex);
         destroy_pair(pair);
+
         return 0;
     }
     pthread_mutex_unlock(emutex);
@@ -166,6 +173,7 @@ void *client_handler(void *arg) {
 
     Pair_t *pair_cached = hashmap_get_or_set(cache, p_res.url);
 
+    printf("here\n");
     if (pair_cached) {
         send_cached_content(cache, pair_cached, client_fd);
         close(client_fd);
@@ -182,6 +190,7 @@ void *client_handler(void *arg) {
         free(client_args);
         return NULL;
     }
+    printf("here after host\n");
 
     vec_size_t written_counter = 0;
     vec_size_t to_write = vector_size(*p_res.full_msg);
@@ -219,6 +228,7 @@ void *client_handler(void *arg) {
 
     pthread_create(&thread_id, NULL, server_handler, &args);
     pthread_detach(thread_id);
+    printf("here after server resp\n");
 
     send_cached_content(cache, pair, client_fd);
     close(client_fd);

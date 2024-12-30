@@ -9,6 +9,7 @@ void iterate_over_map(Cache *cache) {
         Pair_t *pair = item;
         pthread_mutex_lock(&pair->entry->mutex);
 
+        printf("hereoooo\n");
         if (pair->entry->is_realeased_by_gb) {
             pthread_mutex_unlock(&pair->entry->mutex);
             continue;
@@ -35,7 +36,6 @@ void *garbage_collector(void *arg) {
     while (1) {
         struct timeval now;
         struct timespec timeout;
-        // pizdec, mutex == wait
         gettimeofday(&now, NULL);
         timeout.tv_sec = now.tv_sec + TIME_TO_CLEAR;
         timeout.tv_nsec = now.tv_usec * 1000;
@@ -44,6 +44,7 @@ void *garbage_collector(void *arg) {
         pthread_cond_timedwait(&args->cond, &args->mutex, &timeout);
         pthread_mutex_unlock(&args->mutex);
 
+        printf("hereoooo\n");
         pthread_rwlock_wrlock(&cache->lock);
         iterate_over_map(cache);
         pthread_rwlock_unlock(&cache->lock);

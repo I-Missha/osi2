@@ -20,6 +20,7 @@ typedef struct CacheEntry {
     uint8_t is_corresponds_to_cache_size;
     uint64_t ref_counter;
 
+    pthread_rwlock_t lock;
     pthread_mutex_t mutex;
     pthread_cond_t cond;
 } Entry;

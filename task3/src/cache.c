@@ -42,6 +42,7 @@ Entry *create_entry(char *url) {
     entry->is_realeased_by_gb = 0;
     pthread_mutex_init(&entry->mutex, NULL);
     pthread_cond_init(&entry->cond, NULL);
+    pthread_rwlock_init(&entry->lock, NULL);
     return entry;
 }
 
